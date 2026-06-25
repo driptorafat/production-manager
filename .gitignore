@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Microsoft Office temp/lock files
+~$*
+
+# Deploy token — local only, never commit
+.deploy_token
+
+# Claude local settings (machine-specific permissions)
+.claude/settings.local.json

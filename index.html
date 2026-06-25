@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en" id="root-html" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Production Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root,[data-theme="light"]{
+  --pri:#1565C0;--prid:#0D47A1;--pril:#E3F2FD;
+  --acc:#F57C00;--accl:#FFF3E0;
+  --ok:#2E7D32;--okl:#E8F5E9;
+  --warn:#F9A825;--warnl:#FFFDE7;
+  --err:#C62828;--errl:#FFEBEE;
+  --bg:#F0F4F8;--card:#ffffff;--card2:#f8fafc;
+  --bdr:#DEE2E6;--txt:#212529;--muted:#6C757D;
+  --htxt:#0D47A1;--sb:#0D47A1;--inp:#ffffff;--divider:#e9ecef;--sw:230px}
+[data-theme="dark"]{
+  --pri:#60a5fa;--prid:#1d3461;--pril:#1e3a5f;--acc:#fb923c;--accl:#2c1a0a;
+  --ok:#4ade80;--okl:#0d2e18;--warn:#fbbf24;--warnl:#2c1a00;--err:#f87171;--errl:#2c0a0a;
+  --bg:#0d1117;--card:#161b22;--card2:#1c2128;--bdr:#30363d;--txt:#e6edf3;--muted:#8b949e;
+  --htxt:#79c0ff;--sb:#0d1117;--inp:#1c2128;--divider:#21262d;--sw:230px}
+[data-theme="midnight"]{
+  --pri:#a78bfa;--prid:#1e1b4b;--pril:#1e1b4b;--acc:#fb923c;--accl:#2c1200;
+  --ok:#34d399;--okl:#022c22;--warn:#fcd34d;--warnl:#2c1800;--err:#f87171;--errl:#2c0808;
+  --bg:#06070f;--card:#0f1122;--card2:#151829;--bdr:#1e2444;--txt:#dde4f5;--muted:#6272a4;
+  --htxt:#c4b5fd;--sb:#080a18;--inp:#151829;--divider:#1a2040;--sw:230px}
+[data-theme="forest"]{
+  --pri:#34d399;--prid:#065f46;--pril:#022c22;--acc:#fbbf24;--accl:#2c1a00;
+  --ok:#6ee7b7;--okl:#022c22;--warn:#fcd34d;--warnl:#2c1800;--err:#f87171;--errl:#2c0808;
+  --bg:#0a1410;--card:#0f1f17;--card2:#142a1e;--bdr:#1e4030;--txt:#d1fae5;--muted:#5a8f70;
+  --htxt:#6ee7b7;--sb:#061009;--inp:#142a1e;--divider:#1a3525;--sw:230px}
+[data-theme="ocean"]{
+  --pri:#38bdf8;--prid:#0c2a4a;--pril:#0c2a4a;--acc:#fb923c;--accl:#2c1200;
+  --ok:#34d399;--okl:#022c22;--warn:#fbbf24;--warnl:#2c1800;--err:#f87171;--errl:#2c0808;
+  --bg:#03080f;--card:#071526;--card2:#0c1e35;--bdr:#0e2f56;--txt:#cce7ff;--muted:#4a8ab5;
+  --htxt:#38bdf8;--sb:#020810;--inp:#0c1e35;--divider:#0d2444;--sw:230px}
+[data-theme="sepia"]{
+  --pri:#92400e;--prid:#78350f;--pril:#fef3c7;--acc:#c2410c;--accl:#ffedd5;
+  --ok:#166534;--okl:#dcfce7;--warn:#a16207;--warnl:#fffbeb;--err:#991b1b;--errl:#fee2e2;
+  --bg:#f4ede0;--card:#fffbf4;--card2:#fef9ee;--bdr:#d4c5a9;--txt:#3d2b1f;--muted:#7a6552;
+  --htxt:#78350f;--sb:#5c3a1e;--inp:#fffbf4;--divider:#e7dcc6;--sw:230px}
+
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--txt);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.hidden{display:none!important}
+button{font-family:inherit}
+a{color:var(--pri)}
+input,select,textarea{font-family:inherit;font-size:13px;padding:8px 10px;border:1.5px solid var(--bdr);
+  border-radius:8px;background:var(--inp);color:var(--txt);width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+
+/* Login */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9000}
+.login-card{background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:36px 34px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.login-logo{font-size:42px;text-align:center;margin-bottom:8px}
+.login-title{font-size:21px;font-weight:800;text-align:center;color:var(--htxt)}
+.login-sub{font-size:12.5px;color:var(--muted);text-align:center;margin:4px 0 22px}
+.login-card .fg{margin-bottom:14px}
+.login-hint{font-size:11.5px;color:var(--muted);text-align:center;margin-top:14px}
+#login-error{display:none;background:var(--errl);color:var(--err);font-size:12.5px;padding:8px 10px;border-radius:8px;margin-bottom:12px;font-weight:600}
+
+/* Layout */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:var(--sw);background:var(--sb);color:#fff;flex-shrink:0;position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;overflow-y:auto}
+.sb-brand{padding:20px 18px 14px;font-size:17px;font-weight:800;letter-spacing:.3px;display:flex;align-items:center;gap:9px}
+.sb-brand small{display:block;font-size:10px;font-weight:600;opacity:.65;letter-spacing:.4px;margin-top:2px}
+.nav{flex:1;padding:6px 10px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:rgba(255,255,255,.82);
+  cursor:pointer;font-size:13.5px;font-weight:600;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.10);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.18);color:#fff}
+.nav-item .ico{font-size:16px;width:20px;text-align:center}
+.sb-foot{padding:12px;font-size:11px;opacity:.6;border-top:1px solid rgba(255,255,255,.12)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:56px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;align-items:center;
+  gap:14px;padding:0 20px;position:sticky;top:0;z-index:50}
+.topbar .yr-sel{width:auto;min-width:90px}
+.sync-pill{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-weight:600}
+.sync-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sync-ok{background:var(--ok)}.sync-warn{background:var(--warn)}.sync-err{background:var(--err)}
+.topbar-user{font-size:12.5px;font-weight:700;color:var(--txt);padding:5px 12px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px}
+.content{padding:22px;flex:1}
+
+/* Headings */
+.sh{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.sh-t{font-size:22px;font-weight:800;color:var(--htxt)}
+.sh-s{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid transparent;border-radius:9px;padding:9px 16px;
+  font-size:13.5px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--txt);transition:.12s;white-space:nowrap}
+.btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.btn-sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.btn-pri{background:var(--pri);color:#fff}.btn-ok{background:var(--ok);color:#fff}
+.btn-acc{background:var(--acc);color:#fff}.btn-warn{background:var(--warn);color:#3d2b00}
+.btn-err{background:var(--err);color:#fff}
+.btn-ghost{background:transparent;border-color:var(--bdr);color:var(--txt)}
+
+/* Cards & grids */
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:13px;padding:18px}
+.card-title{font-size:14px;font-weight:800;margin-bottom:12px;color:var(--htxt)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--bdr);border-radius:13px;padding:16px 18px;border-left:4px solid var(--pri)}
+.kpi.acc{border-left-color:var(--acc)}.kpi.ok{border-left-color:var(--ok)}
+.kpi.warn{border-left-color:var(--warn)}.kpi.err{border-left-color:var(--err)}
+.kpi-lbl{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.kpi-val{font-size:27px;font-weight:800;margin-top:4px}
+.kpi-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* Progress bar */
+.pbar{height:7px;background:var(--divider);border-radius:5px;overflow:hidden;margin-top:6px}
+.pbar>span{display:block;height:100%;background:var(--pri);border-radius:5px}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--bdr);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--card2);text-align:left;padding:11px 12px;font-size:11.5px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--divider);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--card2)}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.b-stage{background:var(--pril);color:var(--prid)}
+.b-ok{background:var(--okl);color:var(--ok)}.b-warn{background:var(--warnl);color:var(--warn)}
+.b-err{background:var(--errl);color:var(--err)}.b-acc{background:var(--accl);color:var(--acc)}
+.b-mut{background:var(--divider);color:var(--muted)}
+.pri-Urgent{background:var(--errl);color:var(--err)}.pri-High{background:var(--accl);color:var(--acc)}
+.pri-Normal{background:var(--pril);color:var(--prid)}.pri-Low{background:var(--divider);color:var(--muted)}
+
+/* Kanban */
+.board{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;align-items:flex-start}
+.col{background:var(--card2);border:1px solid var(--bdr);border-radius:13px;min-width:270px;width:270px;flex-shrink:0;display:flex;flex-direction:column;max-height:calc(100vh - 200px)}
+.col-h{padding:12px 14px;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--card2);border-radius:13px 13px 0 0}
+.col-h .cnt{font-size:11px;background:var(--card);border:1px solid var(--bdr);border-radius:20px;padding:1px 9px;color:var(--muted)}
+.col-body{padding:10px;overflow-y:auto;flex:1;min-height:80px}
+.col-body.dragover{background:var(--pril);outline:2px dashed var(--pri);outline-offset:-6px;border-radius:10px}
+.kcard{background:var(--card);border:1px solid var(--bdr);border-radius:10px;padding:11px 12px;margin-bottom:9px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.kcard:active{cursor:grabbing}
+.kcard.drag{opacity:.45}
+.kcard-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.kcard-ono{font-weight:800;font-size:13px;color:var(--htxt)}
+.kcard-party{font-size:12px;color:var(--muted);margin-top:1px}
+.kcard-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.kcard-due{font-size:11px;font-weight:700}
+.due-over{color:var(--err)}.due-soon{color:var(--acc)}.due-ok{color:var(--muted)}
+
+/* Modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:30px 14px;overflow-y:auto}
+.ov.open{display:flex}
+.modal{background:var(--card);border-radius:15px;width:760px;max-width:97vw;box-shadow:0 24px 70px rgba(0,0,0,.3);margin:auto}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr)}
+.mh h3{font-size:17px;color:var(--htxt)}
+.xbtn{background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1}
+.mb{padding:20px;max-height:72vh;overflow-y:auto}
+.mf{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--bdr)}
+.fg{margin-bottom:13px}
+.fg-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.fg.full{grid-column:1/-1}
+@media(max-width:600px){.fg-grid{grid-template-columns:1fr}}
+
+/* Stage pipeline */
+.pipe{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.pipe-step{flex:1;min-width:80px;text-align:center;padding:8px 6px;border:1.5px solid var(--bdr);border-radius:9px;
+  font-size:11.5px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--muted);position:relative}
+.pipe-step.done{background:var(--okl);border-color:var(--ok);color:var(--ok)}
+.pipe-step.current{background:var(--pri);border-color:var(--pri);color:#fff}
+
+/* checklist / materials */
+.chk-row,.mat-row{display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.chk-row input[type=checkbox]{width:17px;height:17px;flex-shrink:0}
+.del-x{background:var(--errl);color:var(--err);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:15px;flex-shrink:0}
+
+.empty{text-align:center;padding:46px 20px;color:var(--muted);background:var(--card);border:1.5px dashed var(--bdr);border-radius:13px}
+.empty-ico{font-size:40px;margin-bottom:8px}
+hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--txt);color:var(--bg);
+  padding:11px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:.25s}
+.toast.show{opacity:1}
+.note{background:var(--pril);color:var(--prid);font-size:12.5px;padding:10px 13px;border-radius:9px;margin-bottom:14px}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row{display:grid;grid-template-columns:120px 1fr 48px;align-items:center;gap:10px;font-size:12.5px}
+.bar-track{height:14px;background:var(--divider);border-radius:7px;overflow:hidden}
+.bar-fill{height:100%;border-radius:7px;background:var(--pri)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.toolbar input,.toolbar select{width:auto}
+.search-inp{min-width:240px;flex:1;max-width:380px}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--card2);border:1px solid var(--bdr);color:var(--muted)}
+@media print{.sidebar,.topbar{display:none}.content{padding:0}}
+@media(max-width:780px){.sidebar{position:fixed;left:0;top:0;z-index:300;transform:translateX(-100%);transition:.2s}
+  .sidebar.open{transform:none}.menu-btn{display:inline-flex!important}}
+.menu-btn{display:none}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🏭</div>
+    <div class="login-title">Production Manager</div>
+    <div class="login-sub">Track manufacturing from order to shipment</div>
+    <div id="login-error"></div>
+    <div class="fg"><label>Username</label><input id="l-user" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Password</label><input id="l-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn btn-pri" style="width:100%;justify-content:center" onclick="doLogin()">Sign In</button>
+    <div class="login-hint">Default login — <strong>admin</strong> / <strong>admin123</strong><br>Change it in Settings after first login.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="layout hidden" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">🏭 <div>Production<small>MANAGER</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sb-foot">v1.0 · syncs with Export Manager</div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost btn-sm menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <select class="yr-sel" id="yr-sel" onchange="changeYear(this.value)"></select>
+      <span class="sync-pill" id="sync-status"><span class="sync-dot"></span>Not synced</span>
+      <span class="topbar-user" id="topbar-user">👤 admin</span>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<!-- Order detail modal -->
+<div class="ov" id="ord-ov"><div class="modal"><div class="mh"><h3 id="ord-title">Production Order</h3><button class="xbtn" onclick="closeModal('ord-ov')">×</button></div><div class="mb" id="ord-body"></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('ord-ov')">Cancel</button><button class="btn btn-pri" onclick="saveOrder()">💾 Save Order</button></div></div></div>
+
+<!-- Confirm modal -->
+<div class="ov" id="cf-ov"><div class="modal" style="width:430px"><div class="mh"><h3 id="cf-title">Confirm</h3><button class="xbtn" onclick="closeModal('cf-ov')">×</button></div><div class="mb"><p id="cf-msg" style="font-size:13.5px"></p></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('cf-ov')">Cancel</button><button class="btn btn-err" id="cf-ok">Confirm</button></div></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  Production Manager — single-file app. Syncs with Export Manager via GitHub Gist.
+// ════════════════════════════════════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const PRIORITIES=['Low','Normal','High','Urgent'];
+const DEFAULT_STAGES=['Pending','Material Sourcing','In Production','Quality Check','Packing','Ready to Ship','Shipped'];
+const DEFAULT_AUTH={username:'admin',password:'admin123'};
+const GIST_PROD_FILE='production.json';
+const GIST_EM_FILE='exportmanager.json';
+
+let PD={};                 // main state
+let editingId=null;        // order being edited
+let draftPhotos=[];        // photos in the open editor
+
+// ── Number / date helpers ──────────────────────────────────────────────────
+const fUSD=n=>'$'+(+n||0).toLocaleString(undefined,{maximumFractionDigits:0});
+function fmtDate(s){if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return s||'—';const d=new Date(s+'T00:00:00');return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}
+function daysUntil(s){if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const d=new Date(s+'T00:00:00');const t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/86400000)}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function curYear(){return PD.currentYear||String(new Date().getFullYear())}
+
+// ── Stages helpers ─────────────────────────────────────────────────────────
+function stages(){return (PD.stages&&PD.stages.length)?PD.stages:DEFAULT_STAGES}
+function stageIdx(name){const i=stages().indexOf(name);return i<0?0:i}
+function stageProgress(name){const s=stages();const i=s.indexOf(name);if(i<0)return 0;if(s.length<=1)return 100;return Math.round(i/(s.length-1)*100)}
+function isShippedStage(name){return name===stages()[stages().length-1]}
+
+// ── Year / order data accessors ────────────────────────────────────────────
+function ensureYear(y){if(!PD.years[y])PD.years[y]={prods:[]}}
+function getProds(y){y=y||curYear();ensureYear(y);return PD.years[y].prods}
+function setProds(y,list){ensureYear(y);PD.years[y].prods=list;saveAll()}
+function findProd(id){for(const y in PD.years){const p=(PD.years[y].prods||[]).find(x=>x.id===id);if(p)return p}return null}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  STORAGE — IndexedDB with localStorage fallback (mirrors Export Manager)
+// ════════════════════════════════════════════════════════════════════════════
+let _idb=null;
+function _openIDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open('pm_db',1);
+  r.onupgradeneeded=e=>{e.target.result.createObjectStore('kv')};
+  r.onsuccess=e=>{_idb=e.target.result;res()};r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
+function _idbGet(k){return new Promise((res,rej)=>{const t=_idb.transaction('kv','readonly').objectStore('kv').get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error)})}
+function _idbSet(k,v){return new Promise((res,rej)=>{const t=_idb.transaction('kv','readwrite').objectStore('kv').put(v,k);t.onsuccess=()=>res();t.onerror=()=>rej(t.error)})}
+
+function defaultData(){const y=String(new Date().getFullYear());return{currentYear:y,years:{[y]:{prods:[]}},
+  cloud:{token:'',gistId:'',autoSync:false},stages:[...DEFAULT_STAGES]}}
+
+async function loadData(){
+  let d=null;
+  try{await _openIDB();d=await _idbGet('pm_v1');
+    if(!d){const raw=localStorage.getItem('pm_v1');if(raw){try{d=JSON.parse(raw)}catch(e){}}if(d){await _idbSet('pm_v1',d);localStorage.removeItem('pm_v1')}}
+  }catch(e){console.warn('IndexedDB unavailable, using localStorage',e);const raw=localStorage.getItem('pm_v1');if(raw){try{d=JSON.parse(raw)}catch(e){}}}
+  if(!d)d=defaultData();
+  PD=Object.assign(defaultData(),d);
+  if(!PD.cloud)PD.cloud={token:'',gistId:'',autoSync:false};
+  if(!PD.stages||!PD.stages.length)PD.stages=[...DEFAULT_STAGES];
+}
+let _saveT=null;
+function saveAll(){
+  if(_idb){_idbSet('pm_v1',PD).catch(e=>toast('⚠️ Save failed: '+e.message));}
+  else{try{localStorage.setItem('pm_v1',JSON.stringify(PD))}catch(e){toast('⚠️ Storage full: '+e.message)}}
+  if(PD.cloud&&PD.cloud.autoSync&&PD.cloud.token&&PD.cloud.gistId){clearTimeout(_saveT);_saveT=setTimeout(()=>doPushProduction(true),2500);}
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+function loadAuth(){const s=localStorage.getItem('pm_auth');if(s){try{return JSON.parse(s)}catch(e){}}return{...DEFAULT_AUTH}}
+function saveAuth(o){localStorage.setItem('pm_auth',JSON.stringify(o))}
+function doLogin(){
+  const u=$('l-user').value.trim(),p=$('l-pass').value,err=$('login-error');
+  if(!u||!p){err.textContent='Please enter both fields.';err.style.display='block';return}
+  const a=loadAuth();
+  if(u===a.username&&p===(a.password||DEFAULT_AUTH.password)){
+    sessionStorage.setItem('pm_session','ok');sessionStorage.setItem('pm_user',u);
+    $('login-screen').classList.add('hidden');err.style.display='none';
+    $('l-pass').value='';$('l-user').value='';$('topbar-user').textContent='👤 '+u;
+    bootApp();
+  }else{err.textContent='Incorrect username or password.';err.style.display='block';$('l-pass').value='';$('l-pass').focus()}
+}
+function doLogout(){sessionStorage.removeItem('pm_session');sessionStorage.removeItem('pm_user');$('app').classList.add('hidden');$('login-screen').classList.remove('hidden')}
+
+// ── UI utils ─────────────────────────────────────────────────────────────────
+let _tt=null;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600)}
+function openModal(id){$(id).classList.add('open')}
+function closeModal(id){$(id).classList.remove('open')}
+function confirm2(title,msg,onok,okLabel,okClass){$('cf-title').textContent=title;$('cf-msg').textContent=msg;
+  const b=$('cf-ok');b.textContent=okLabel||'Confirm';b.className='btn '+(okClass||'btn-err');
+  b.onclick=()=>{closeModal('cf-ov');onok()};openModal('cf-ov')}
+function setSync(type,msg){const el=$('sync-status');if(el)el.innerHTML='<span class="sync-dot sync-'+type+'"></span>'+esc(msg)}
+function setTheme(t){$('root-html').setAttribute('data-theme',t);localStorage.setItem('pm_theme',t)}
+
+// ── Routing ──────────────────────────────────────────────────────────────────
+const ROUTES=[['dashboard','📊','Dashboard'],['board','🗂️','Production Board'],['orders','📋','Orders'],
+  ['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
+let route='dashboard';
+function go(r){route=r;document.getElementById('sidebar').classList.remove('open');render()}
+function renderNav(){$('nav').innerHTML=ROUTES.map(([id,ic,lbl])=>
+  `<button class="nav-item ${route===id?'active':''}" onclick="go('${id}')"><span class="ico">${ic}</span>${lbl}</button>`).join('')}
+
+function updateYrSel(){
+  const years=Object.keys(PD.years).sort((a,b)=>b-a);
+  const cy=String(new Date().getFullYear());if(!years.includes(cy)){years.unshift(cy)}
+  $('yr-sel').innerHTML=years.map(y=>`<option value="${y}" ${y===curYear()?'selected':''}>${y}</option>`).join('');
+}
+function changeYear(y){PD.currentYear=y;ensureYear(y);saveAll();render()}
+
+function render(){
+  renderNav();updateYrSel();
+  const c=$('content');
+  if(route==='dashboard')c.innerHTML=renderDashboard();
+  else if(route==='board')c.innerHTML=renderBoard();
+  else if(route==='orders')c.innerHTML=renderOrders();
+  else if(route==='calendar')c.innerHTML=renderCalendar();
+  else if(route==='reports')c.innerHTML=renderReports();
+  else if(route==='settings')c.innerHTML=renderSettings();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+function donutSVG(segs,size){size=size||150;const r=size/2-14,cx=size/2,cy=size/2,C=2*Math.PI*r;
+  const realTotal=segs.reduce((a,s)=>a+s.value,0);const total=realTotal||1;let off=0;
+  const circles=segs.filter(s=>s.value>0).map(s=>{const len=s.value/total*C;
+    const el=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    off+=len;return el}).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--divider)" stroke-width="20"></circle>${circles}<text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="26" font-weight="800" fill="var(--txt)">${realTotal}</text><text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="10" fill="var(--muted)">ORDERS</text></svg>`}
+
+const STAGE_COLORS=['#94a3b8','#f59e0b','#3b82f6','#a855f7','#06b6d4','#10b981','#22c55e','#ec4899','#f43f5e'];
+
+function renderDashboard(){
+  const y=curYear();const all=getProds(y);
+  const active=all.filter(p=>!p.cancelled&&!isShippedStage(p.stage));
+  const shipped=all.filter(p=>!p.cancelled&&isShippedStage(p.stage));
+  const inProd=all.filter(p=>!p.cancelled&&['Material Sourcing','In Production','Quality Check','Packing','Ready to Ship'].includes(p.stage));
+  let overdue=0,dueSoon=0,onTime=0,late=0;
+  active.forEach(p=>{const d=daysUntil(p.exf);if(d!==null){if(d<0)overdue++;else if(d<=7)dueSoon++}});
+  shipped.forEach(p=>{const d=daysUntil(p.exf);if(p.shipDate&&p.exf){if(p.shipDate<=p.exf)onTime++;else late++}});
+  const otp=(onTime+late)?Math.round(onTime/(onTime+late)*100):null;
+  const totalQty=active.reduce((a,p)=>a+(+p.qty||0),0);
+  const totalVal=active.reduce((a,p)=>a+(+p.value||0),0);
+
+  // stage distribution
+  const stg=stages();const dist=stg.map((s,i)=>({label:s,value:all.filter(p=>!p.cancelled&&p.stage===s).length,color:STAGE_COLORS[i%STAGE_COLORS.length]}));
+  // monthly bars (orders by ex-factory month)
+  const monthCounts=MONTHS.map(m=>all.filter(p=>!p.cancelled&&p.month===m).length);
+  const maxM=Math.max(1,...monthCounts);
+  // upcoming
+  const upcoming=active.filter(p=>daysUntil(p.exf)!==null).sort((a,b)=>daysUntil(a.exf)-daysUntil(b.exf)).slice(0,8);
+
+  const kpi=(lbl,val,sub,cls)=>`<div class="kpi ${cls||''}"><div class="kpi-lbl">${lbl}</div><div class="kpi-val">${val}</div><div class="kpi-sub">${sub||''}</div></div>`;
+
+  return `
+<div class="sh"><div><div class="sh-t">Dashboard — ${y}</div><div class="sh-s">Live production overview</div></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="doPullOrders()">⬇ Import Orders</button><button class="btn btn-pri btn-sm" onclick="openOrder(null)">+ New Order</button></div></div>
+
+${all.length===0?`<div class="note">👋 No production orders yet for ${y}. Click <strong>Import Orders</strong> to pull them from your Export Manager (Settings → Cloud Sync first), or <strong>+ New Order</strong> to add one manually.</div>`:''}
+
+<div class="kpis">
+  ${kpi('Active Orders',active.length,inProd.length+' in production','')}
+  ${kpi('Due ≤ 7 days',dueSoon,'approaching ex-factory','warn')}
+  ${kpi('Overdue',overdue,overdue?'needs attention':'all on track',overdue?'err':'ok')}
+  ${kpi('Shipped',shipped.length,'completed in '+y,'ok')}
+  ${kpi('On-time Rate',otp===null?'—':otp+'%',(onTime+late)+' shipped w/ dates','acc')}
+  ${kpi('Active Units',totalQty.toLocaleString(),fUSD(totalVal)+' order value','')}
+</div>
+
+<div class="g2">
+  <div class="card"><div class="card-title">Orders by Stage</div>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div>${donutSVG(dist,160)}</div>
+      <div style="flex:1;min-width:150px">${dist.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12.5px"><span style="width:11px;height:11px;border-radius:3px;background:${d.color};flex-shrink:0"></span><span style="flex:1">${esc(d.label)}</span><strong>${d.value}</strong></div>`).join('')}</div>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">Upcoming Deadlines</div>
+    ${upcoming.length?upcoming.map(p=>{const d=daysUntil(p.exf);const cls=d<0?'due-over':d<=7?'due-soon':'due-ok';const lbl=d<0?Math.abs(d)+'d overdue':d===0?'due today':'in '+d+'d';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--divider);cursor:pointer" onclick="openOrder('${p.id}')"><div><div style="font-weight:700;font-size:13px">${esc(p.orderNo||'—')}</div><div style="font-size:11.5px;color:var(--muted)">${esc(p.party||'')} · ${esc(p.stage)}</div></div><div style="text-align:right"><div class="kcard-due ${cls}">${lbl}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(p.exf)}</div></div></div>`}).join(''):'<div style="color:var(--muted);font-size:13px;padding:14px 0">No dated active orders.</div>'}
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px"><div class="card-title">Orders by Ex-Factory Month</div>
+  <div class="bars">${MONTHS.map((m,i)=>monthCounts[i]?`<div class="bar-row"><span>${m.slice(0,3)}</span><div class="bar-track"><div class="bar-fill" style="width:${monthCounts[i]/maxM*100}%"></div></div><span style="text-align:right">${monthCounts[i]}</span></div>`:'').join('')||'<div style="color:var(--muted);font-size:13px">No data.</div>'}</div>
+</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PRODUCTION BOARD (Kanban)
+// ════════════════════════════════════════════════════════════════════════════
+function renderBoard(){
+  const y=curYear();const all=getProds(y).filter(p=>!p.cancelled);const stg=stages();
+  return `
+<div class="sh"><div><div class="sh-t">Production Board — ${y}</div><div class="sh-s">Drag cards between stages to update progress</div></div>
+  <button class="btn btn-pri btn-sm" onclick="openOrder(null)">+ New Order</button></div>
+<div class="board">${stg.map((s,i)=>{const items=all.filter(p=>p.stage===s||(i===0&&!stg.includes(p.stage)));
+  return `<div class="col"><div class="col-h"><span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${STAGE_COLORS[i%STAGE_COLORS.length]};margin-right:6px"></span>${esc(s)}</span><span class="cnt">${items.length}</span></div>
+  <div class="col-body" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="dropCard(event,'${esc(s).replace(/'/g,"\\'")}')">
+  ${items.map(p=>kcard(p)).join('')||'<div style="color:var(--muted);font-size:11.5px;text-align:center;padding:14px 0">—</div>'}
+  </div></div>`}).join('')}</div>`;
+}
+function kcard(p){const d=daysUntil(p.exf);const cls=d===null?'due-ok':d<0?'due-over':d<=7?'due-soon':'due-ok';
+  const lbl=d===null?(p.exf||'no date'):d<0?Math.abs(d)+'d late':d===0?'today':d+'d';
+  return `<div class="kcard" draggable="true" ondragstart="dragStart(event,'${p.id}')" ondragend="this.classList.remove('drag')" onclick="openOrder('${p.id}')">
+    <div class="kcard-top"><div><div class="kcard-ono">${esc(p.orderNo||'—')}</div><div class="kcard-party">${esc(p.party||'')}</div></div>
+      <span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></div>
+    ${p.product?`<div style="font-size:11.5px;color:var(--muted);margin-top:5px">📦 ${esc(p.product)}${p.qty?' · '+(+p.qty).toLocaleString()+' pcs':''}</div>`:''}
+    <div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div>
+    <div class="kcard-meta"><span class="kcard-due ${cls}">📅 ${esc(lbl)}</span>${p.dest?`<span class="tag">${esc(p.dest)}</span>`:''}</div>
+  </div>`}
+function dragStart(e,id){e.dataTransfer.setData('id',id);e.target.classList.add('drag')}
+function dropCard(e,stageName){e.preventDefault();document.querySelectorAll('.col-body').forEach(c=>c.classList.remove('dragover'));
+  const id=e.dataTransfer.getData('id');const p=findProd(id);if(!p||p.stage===stageName)return;
+  p.stage=stageName;p.progress=stageProgress(stageName);p.updatedAt=Date.now();
+  if(isShippedStage(stageName)&&!p.shipDate)p.shipDate=todayISO();
+  saveAll();render();toast('Moved '+(p.orderNo||'order')+' → '+stageName)}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ORDERS TABLE
+// ════════════════════════════════════════════════════════════════════════════
+let ordFilter={q:'',stage:'',prio:''};
+function renderOrders(){
+  const y=curYear();let list=getProds(y).slice();
+  return `
+<div class="sh"><div><div class="sh-t">Production Orders — ${y}</div><div class="sh-s">${list.length} order${list.length!==1?'s':''}</div></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="doPullOrders()">⬇ Import Orders</button><button class="btn btn-ghost btn-sm" onclick="exportCSV()">📥 Export CSV</button><button class="btn btn-pri btn-sm" onclick="openOrder(null)">+ New Order</button></div></div>
+<div class="toolbar">
+  <input class="search-inp" id="ord-q" placeholder="🔍 Search order #, buyer, product, destination…" value="${esc(ordFilter.q)}" oninput="ordFilter.q=this.value;paintOrders()">
+  <select id="ord-stage" onchange="ordFilter.stage=this.value;paintOrders()"><option value="">All stages</option>${stages().map(s=>`<option ${ordFilter.stage===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+  <select id="ord-prio" onchange="ordFilter.prio=this.value;paintOrders()"><option value="">All priorities</option>${PRIORITIES.map(s=>`<option ${ordFilter.prio===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+</div>
+<div id="ord-table"></div>`;
+}
+function filteredOrders(){
+  const q=ordFilter.q.toLowerCase();
+  return getProds(curYear()).filter(p=>{
+    if(ordFilter.stage&&p.stage!==ordFilter.stage)return false;
+    if(ordFilter.prio&&(p.priority||'Normal')!==ordFilter.prio)return false;
+    if(q){const hay=[p.orderNo,p.party,p.product,p.dest,p.notes].join(' ').toLowerCase();if(!hay.includes(q))return false}
+    return true}).sort((a,b)=>{const da=daysUntil(a.exf),db=daysUntil(b.exf);if(da===null)return 1;if(db===null)return -1;return da-db});
+}
+function paintOrders(){
+  const list=filteredOrders();const el=$('ord-table');if(!el)return;
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>No orders match. <a href="#" onclick="openOrder(null);return false">Add one</a> or import from Export Manager.</div>';return}
+  el.innerHTML=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Order #</th><th>Buyer</th><th>Product</th><th>Dest</th><th>Qty</th><th>Stage</th><th style="width:120px">Progress</th><th>Ex-Factory</th><th>Priority</th><th></th></tr></thead><tbody>
+    ${list.map(p=>{const d=daysUntil(p.exf);const dcls=d===null?'':d<0?'b-err':d<=7?'b-warn':'';
+      const dtxt=d===null?fmtDate(p.exf):d<0?Math.abs(d)+'d late':d===0?'today':'in '+d+'d';
+      return `<tr style="cursor:pointer" onclick="openOrder('${p.id}')">
+      <td><strong>${esc(p.orderNo||'—')}</strong>${p.cancelled?' <span class="badge b-err">Cancelled</span>':''}${p.source==='export-manager'?' <span class="tag" title="Imported from Export Manager">🔗</span>':''}</td>
+      <td>${esc(p.party||'—')}</td><td>${esc(p.product||'—')}</td><td>${esc(p.dest||'—')}</td>
+      <td>${p.qty?(+p.qty).toLocaleString():'—'}</td>
+      <td><span class="badge b-stage">${esc(p.stage)}</span></td>
+      <td><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
+      <td>${fmtDate(p.exf)} ${dcls?`<span class="badge ${dcls}">${dtxt}</span>`:''}</td>
+      <td><span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></td>
+      <td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openOrder('${p.id}')">✏️</button></td></tr>`}).join('')}
+    </tbody></table></div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ORDER EDITOR MODAL
+// ════════════════════════════════════════════════════════════════════════════
+function blankProd(){return{id:uid(),year:curYear(),month:MONTHS[new Date().getMonth()],orderNo:'',party:'',dest:'',
+  product:'',qty:'',vol:'',exf:'',value:'',stage:stages()[0],priority:'Normal',startDate:todayISO(),
+  checklist:[],materials:[],qc:{status:'Pending',notes:''},photos:[],notes:'',source:'manual',cancelled:false}}
+let draftChecklist=[],draftMaterials=[];
+function openOrder(id){
+  let p;
+  if(id){p=findProd(id);if(!p){toast('Order not found');return}editingId=id}
+  else{p=blankProd();editingId=null}
+  draftChecklist=JSON.parse(JSON.stringify(p.checklist||[]));
+  draftMaterials=JSON.parse(JSON.stringify(p.materials||[]));
+  draftPhotos=(p.photos||[]).slice();
+  $('ord-title').textContent=id?('Order '+(p.orderNo||'')):'New Production Order';
+  $('ord-body').innerHTML=orderForm(p);
+  openModal('ord-ov');
+}
+function orderForm(p){
+  const stg=stages();const ci=stageIdx(p.stage);
+  return `
+<input type="hidden" id="of-id" value="${esc(p.id)}">
+<div class="card" style="padding:14px;margin-bottom:16px;background:var(--card2)">
+  <div style="font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Production Stage — ${stageProgress(p.stage)}% complete</div>
+  <div class="pipe">${stg.map((s,i)=>`<div class="pipe-step ${i<ci?'done':''} ${i===ci?'current':''}" onclick="setFormStage('${esc(s).replace(/'/g,"\\'")}')">${esc(s)}</div>`).join('')}</div>
+  <input type="hidden" id="of-stage" value="${esc(p.stage)}">
+</div>
+
+<div class="fg-grid">
+  <div class="fg"><label>Order No ${p.source==='export-manager'?'<span class="tag">🔗 from Export Manager</span>':''}</label><input id="of-orderNo" value="${esc(p.orderNo)}" placeholder="e.g. BC037900"></div>
+  <div class="fg"><label>Buyer / Party</label><input id="of-party" value="${esc(p.party)}" placeholder="e.g. Bunnik Creations"></div>
+  <div class="fg"><label>Product / Item</label><input id="of-product" value="${esc(p.product)}" placeholder="e.g. Seagrass Basket Set"></div>
+  <div class="fg"><label>Destination</label><input id="of-dest" value="${esc(p.dest)}" placeholder="e.g. USA"></div>
+  <div class="fg"><label>Quantity (pcs)</label><input type="number" id="of-qty" value="${esc(p.qty)}" placeholder="0"></div>
+  <div class="fg"><label>Volume (CBM)</label><input type="number" step="0.01" id="of-vol" value="${esc(p.vol)}" placeholder="0"></div>
+  <div class="fg"><label>Order Value (USD)</label><input type="number" id="of-value" value="${esc(p.value)}" placeholder="0"></div>
+  <div class="fg"><label>Month</label><select id="of-month">${MONTHS.map(m=>`<option ${p.month===m?'selected':''}>${m}</option>`).join('')}</select></div>
+  <div class="fg"><label>Start Date</label><input type="date" id="of-start" value="${esc(p.startDate)}"></div>
+  <div class="fg"><label>Ex-Factory / Deadline</label><input type="date" id="of-exf" value="${/^\d{4}-\d{2}-\d{2}$/.test(p.exf)?p.exf:''}"></div>
+  <div class="fg"><label>Priority</label><select id="of-prio">${PRIORITIES.map(s=>`<option ${(p.priority||'Normal')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div class="fg"><label>Quality Check</label><select id="of-qc">${['Pending','Pass','Fail','Rework'].map(s=>`<option ${(p.qc&&p.qc.status||'Pending')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+</div>
+
+<hr class="div">
+<label>Production Checklist</label>
+<div id="of-checklist">${checklistHTML()}</div>
+<button class="btn btn-ghost btn-sm" onclick="addChecklist()" style="margin-top:4px">+ Add task</button>
+
+<hr class="div">
+<label>Raw Materials / BOM</label>
+<div id="of-materials">${materialsHTML()}</div>
+<button class="btn btn-ghost btn-sm" onclick="addMaterial()" style="margin-top:4px">+ Add material</button>
+
+<hr class="div">
+<div class="fg full"><label>Notes</label><textarea id="of-notes" rows="3" placeholder="Production notes, issues, instructions…">${esc(p.notes)}</textarea></div>
+
+<div class="fg full"><label>Photos</label>
+  <input type="file" accept="image/*" multiple onchange="addPhotos(this)" style="font-size:11px;padding:4px">
+  <div id="of-photos" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${photosHTML()}</div>
+</div>
+
+<hr class="div">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--err)"><input type="checkbox" id="of-cancel" ${p.cancelled?'checked':''} style="width:auto"> Mark order as cancelled</label>
+${editingId?'<div style="margin-top:14px"><button class="btn btn-err btn-sm" onclick="deleteOrder()">🗑 Delete this order</button></div>':''}
+`;
+}
+function setFormStage(s){$('of-stage').value=s;const p=collectForm();$('ord-body').innerHTML=orderForm(p)}
+function checklistHTML(){return draftChecklist.length?draftChecklist.map((c,i)=>`<div class="chk-row"><input type="checkbox" ${c.done?'checked':''} onchange="draftChecklist[${i}].done=this.checked"><input value="${esc(c.text)}" oninput="draftChecklist[${i}].text=this.value" placeholder="Task…"><button class="del-x" onclick="draftChecklist.splice(${i},1);$('of-checklist').innerHTML=checklistHTML()">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">No tasks yet.</div>'}
+function addChecklist(){draftChecklist.push({text:'',done:false});$('of-checklist').innerHTML=checklistHTML()}
+function materialsHTML(){return `<div style="display:grid;grid-template-columns:1fr 80px 80px 70px 34px;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:4px"><span>MATERIAL</span><span>NEEDED</span><span>RECEIVED</span><span>UNIT</span><span></span></div>`+
+  (draftMaterials.length?draftMaterials.map((m,i)=>`<div style="display:grid;grid-template-columns:1fr 80px 80px 70px 34px;gap:6px;margin-bottom:6px"><input value="${esc(m.name)}" oninput="draftMaterials[${i}].name=this.value" placeholder="e.g. Seagrass"><input type="number" value="${esc(m.req)}" oninput="draftMaterials[${i}].req=this.value"><input type="number" value="${esc(m.recv)}" oninput="draftMaterials[${i}].recv=this.value"><input value="${esc(m.unit)}" oninput="draftMaterials[${i}].unit=this.value" placeholder="kg"><button class="del-x" onclick="draftMaterials.splice(${i},1);$('of-materials').innerHTML=materialsHTML()">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">No materials listed.</div>')}
+function addMaterial(){draftMaterials.push({name:'',req:'',recv:'',unit:''});$('of-materials').innerHTML=materialsHTML()}
+function photosHTML(){return draftPhotos.map((src,i)=>`<div style="position:relative"><img src="${src}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--bdr)"><button class="del-x" style="position:absolute;top:-7px;right:-7px;width:22px;height:22px;font-size:12px" onclick="draftPhotos.splice(${i},1);$('of-photos').innerHTML=photosHTML()">×</button></div>`).join('')}
+function compressImg(file,cb){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height,M=900;if(w>M||h>M){const s=Math.min(M/w,M/h);w=Math.round(w*s);h=Math.round(h*s)}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cb(cv.toDataURL('image/jpeg',0.7))};img.src=ev.target.result};r.readAsDataURL(file)}
+function addPhotos(inp){[...inp.files].forEach(f=>compressImg(f,d=>{draftPhotos.push(d);$('of-photos').innerHTML=photosHTML()}));inp.value=''}
+
+function collectForm(){
+  return{id:$('of-id').value,year:curYear(),month:$('of-month').value,orderNo:$('of-orderNo').value.trim(),
+    party:$('of-party').value.trim(),dest:$('of-dest').value.trim(),product:$('of-product').value.trim(),
+    qty:$('of-qty').value,vol:$('of-vol').value,value:$('of-value').value,exf:$('of-exf').value,
+    startDate:$('of-start').value,stage:$('of-stage').value,priority:$('of-prio').value,
+    qc:{status:$('of-qc').value,notes:(findProd($('of-id').value)||{}).qc?.notes||''},
+    checklist:draftChecklist,materials:draftMaterials,photos:draftPhotos,notes:$('of-notes').value,
+    cancelled:$('of-cancel').checked};
+}
+function saveOrder(){
+  const f=collectForm();
+  if(!f.orderNo&&!f.party){toast('Add at least an order # or buyer');return}
+  f.progress=stageProgress(f.stage);f.updatedAt=Date.now();
+  const list=getProds(curYear());
+  const existing=list.find(p=>p.id===f.id);
+  if(existing){const src=existing.source;const shipDate=existing.shipDate;Object.assign(existing,f);existing.source=src||'manual';
+    if(isShippedStage(f.stage)&&!shipDate)existing.shipDate=todayISO();else existing.shipDate=shipDate;}
+  else{f.source='manual';if(isShippedStage(f.stage))f.shipDate=todayISO();list.push(f)}
+  setProds(curYear(),list);closeModal('ord-ov');render();toast('✅ Order saved');
+}
+function deleteOrder(){const id=$('of-id').value;confirm2('Delete order?','This permanently removes the production order. This cannot be undone.',()=>{
+  const list=getProds(curYear()).filter(p=>p.id!==id);setProds(curYear(),list);closeModal('ord-ov');render();toast('Deleted')})}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DEADLINES / CALENDAR
+// ════════════════════════════════════════════════════════════════════════════
+function renderCalendar(){
+  const y=curYear();const active=getProds(y).filter(p=>!p.cancelled&&!isShippedStage(p.stage));
+  const groups={Overdue:[],'This week':[],'Next 30 days':[],Later:[],'No date':[]};
+  active.forEach(p=>{const d=daysUntil(p.exf);if(d===null)groups['No date'].push(p);else if(d<0)groups['Overdue'].push(p);else if(d<=7)groups['This week'].push(p);else if(d<=30)groups['Next 30 days'].push(p);else groups['Later'].push(p)});
+  Object.values(groups).forEach(g=>g.sort((a,b)=>{const x=daysUntil(a.exf),z=daysUntil(b.exf);return (x===null?9e9:x)-(z===null?9e9:z)}));
+  const colors={'Overdue':'err','This week':'warn','Next 30 days':'acc','Later':'','No date':'mut'};
+  const card=p=>{const d=daysUntil(p.exf);const lbl=d===null?'no date':d<0?Math.abs(d)+'d late':d===0?'today':'in '+d+'d';
+    return `<div class="card" style="padding:12px 14px;margin-bottom:9px;cursor:pointer;border-left:4px solid var(--${d!==null&&d<0?'err':d!==null&&d<=7?'warn':'pri'})" onclick="openOrder('${p.id}')">
+    <div style="display:flex;justify-content:space-between;gap:8px"><div><strong>${esc(p.orderNo||'—')}</strong> <span class="badge b-stage">${esc(p.stage)}</span><div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(p.party||'')} ${p.product?'· '+esc(p.product):''}</div></div>
+    <div style="text-align:right"><div style="font-weight:800;font-size:13px">${fmtDate(p.exf)}</div><div style="font-size:11.5px;color:var(--muted)">${lbl}</div></div></div></div>`};
+  return `<div class="sh"><div><div class="sh-t">Deadlines — ${y}</div><div class="sh-s">Active orders by ex-factory date</div></div></div>
+  ${Object.keys(groups).map(g=>groups[g].length?`<div style="margin-bottom:20px"><div class="card-title" style="display:flex;align-items:center;gap:8px"><span class="badge b-${colors[g]||'stage'}">${g}</span><span style="color:var(--muted);font-weight:600;font-size:12px">${groups[g].length}</span></div>${groups[g].map(card).join('')}</div>`:'').join('')||'<div class="empty"><div class="empty-ico">📅</div>No active orders with deadlines.</div>'}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  REPORTS (printable)
+// ════════════════════════════════════════════════════════════════════════════
+function renderReports(){
+  return `<div class="sh"><div><div class="sh-t">Reports — ${curYear()}</div><div class="sh-s">Printable production reports (save as PDF via print dialog)</div></div></div>
+  <div class="g3">
+    <div class="card"><div class="card-title">🏭 Production Status</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">All active orders with stage, progress, deadline and priority.</p><button class="btn btn-pri btn-sm" onclick="printStatus()">🖨 Print</button></div>
+    <div class="card"><div class="card-title">⏰ Deadline / WIP</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Work-in-progress sorted by ex-factory date with overdue flags.</p><button class="btn btn-pri btn-sm" onclick="printDeadlines()">🖨 Print</button></div>
+    <div class="card"><div class="card-title">📦 Materials Summary</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Outstanding raw materials across all active orders.</p><button class="btn btn-pri btn-sm" onclick="printMaterials()">🖨 Print</button></div>
+  </div>`;
+}
+function printWindow(title,body){const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+  body{font-family:-apple-system,Arial,sans-serif;padding:30px;color:#222}h1{font-size:20px;margin-bottom:4px}.sub{color:#666;font-size:12px;margin-bottom:18px}
+  table{border-collapse:collapse;width:100%;font-size:12px}th{background:#0D47A1;color:#fff;text-align:left;padding:7px 9px}td{padding:6px 9px;border-bottom:1px solid #ddd}
+  tr:nth-child(even) td{background:#f5f7fa}.over{color:#C62828;font-weight:700}.foot{margin-top:18px;font-size:11px;color:#888}</style></head><body>
+  <h1>${title}</h1><div class="sub">Production Manager · ${curYear()} · Generated ${new Date().toLocaleString()}</div>${body}
+  <div class="foot">Generated by Production Manager</div></body></html>`);w.document.close();setTimeout(()=>w.print(),400)}
+function printStatus(){const list=getProds(curYear()).filter(p=>!p.cancelled).sort((a,b)=>stageIdx(a.stage)-stageIdx(b.stage));
+  const rows=list.map(p=>`<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${p.qty?(+p.qty).toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td>${fmtDate(p.exf)}</td><td>${p.priority||'Normal'}</td></tr>`).join('');
+  printWindow('Production Status Report',`<table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Qty</th><th>Stage</th><th>Progress</th><th>Ex-Factory</th><th>Priority</th></tr></thead><tbody>${rows}</tbody></table>`)}
+function printDeadlines(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isShippedStage(p.stage)).sort((a,b)=>{const x=daysUntil(a.exf),z=daysUntil(b.exf);return (x===null?9e9:x)-(z===null?9e9:z)});
+  const rows=list.map(p=>{const d=daysUntil(p.exf);const lbl=d===null?'—':d<0?Math.abs(d)+'d LATE':d===0?'today':'in '+d+'d';return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.stage)}</td><td>${fmtDate(p.exf)}</td><td class="${d!==null&&d<0?'over':''}">${lbl}</td></tr>`}).join('');
+  printWindow('Deadline / WIP Report',`<table><thead><tr><th>Order #</th><th>Buyer</th><th>Stage</th><th>Ex-Factory</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`)}
+function printMaterials(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isShippedStage(p.stage));let rows='';
+  list.forEach(p=>(p.materials||[]).forEach(m=>{const out=(+m.req||0)-(+m.recv||0);if(out>0)rows+=`<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(m.name||'')}</td><td>${(+m.req||0).toLocaleString()} ${esc(m.unit||'')}</td><td>${(+m.recv||0).toLocaleString()} ${esc(m.unit||'')}</td><td class="over">${out.toLocaleString()} ${esc(m.unit||'')}</td></tr>`}));
+  printWindow('Outstanding Materials',`<table><thead><tr><th>Order #</th><th>Material</th><th>Needed</th><th>Received</th><th>Outstanding</th></tr></thead><tbody>${rows||'<tr><td colspan=5>No outstanding materials.</td></tr>'}</tbody></table>`)}
+
+function exportCSV(){const list=getProds(curYear());if(!list.length){toast('Nothing to export');return}
+  const cols=['Order No','Buyer','Product','Destination','Qty','CBM','Value USD','Month','Start','Ex-Factory','Stage','Progress %','Priority','QC','Cancelled','Notes'];
+  const rows=[cols].concat(list.map(p=>[p.orderNo,p.party,p.product,p.dest,p.qty,p.vol,p.value,p.month,p.startDate,p.exf,p.stage,stageProgress(p.stage),p.priority,(p.qc&&p.qc.status)||'',p.cancelled?'Yes':'No',p.notes]));
+  const csv=rows.map(r=>r.map(v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);a.download='production_'+curYear()+'.csv';a.click();toast('📥 Exported')}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════════════════════════════════════════════════
+function renderSettings(){
+  const c=PD.cloud||{};const stg=stages();
+  return `<div class="sh"><div><div class="sh-t">Settings</div></div></div>
+<div class="g2">
+  <div class="card"><div class="card-title">☁ Cloud Sync & Export Manager Link</div>
+    <div class="note">Use the <strong>same GitHub token and Gist ID as your Export Manager</strong>. Orders are read from <code>${GIST_EM_FILE}</code>; production data is saved to <code>${GIST_PROD_FILE}</code> in the same private Gist — your export data is never overwritten.</div>
+    <div class="fg"><label>GitHub Personal Access Token (gist scope)</label><input type="password" id="s-token" value="${esc(c.token||'')}" placeholder="ghp_xxxxxxxxxxxx"></div>
+    <div class="fg"><label>Gist ID (same as Export Manager)</label><input id="s-gist" value="${esc(c.gistId||'')}" placeholder="Paste the Gist ID from Export Manager"></div>
+    <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="s-auto" ${c.autoSync?'checked':''} style="width:auto"> Auto-push production data on every change</label></div>
+    <button class="btn btn-pri btn-sm" onclick="saveCloud()">💾 Save Cloud Config</button>
+    <hr class="div">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-acc btn-sm" onclick="doPullOrders()">⬇ Import Orders from Export Manager</button>
+      <button class="btn btn-ok btn-sm" onclick="doPushProduction()">⬆ Push Production Data</button>
+      <button class="btn btn-ghost btn-sm" onclick="doPullProduction()">⬇ Pull Production Data</button>
+    </div>
+    <div style="margin-top:8px"><button class="btn btn-warn btn-sm" onclick="doSyncStatusBack()" title="Updates the 'shipped' status of matching orders inside Export Manager">⤴ Push Shipped Status → Export Manager</button></div>
+  </div>
+
+  <div class="card"><div class="card-title">🎨 Appearance</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">${[['light','☀️ Light','#F0F4F8'],['dark','🌙 Dark','#0d1117'],['midnight','🌌 Midnight','#06070f'],['forest','🌿 Forest','#0a1410'],['ocean','🌊 Ocean','#03080f'],['sepia','📜 Sepia','#f4ede0']].map(([id,l,bg])=>`<button onclick="setTheme('${id}')" style="display:flex;align-items:center;gap:7px;padding:7px 12px;border:1.5px solid var(--bdr);border-radius:9px;background:var(--card);color:var(--txt);cursor:pointer;font-size:12.5px"><span style="width:14px;height:14px;border-radius:50%;background:${bg};border:1px solid var(--bdr)"></span>${l}</button>`).join('')}</div>
+    <hr class="div">
+    <div class="card-title">🛠 Production Stages</div>
+    <div class="note">Define your pipeline. The last stage is treated as "completed/shipped". These become the columns on the board.</div>
+    <div id="stage-editor">${stagesEditorHTML()}</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="addStage()">+ Add stage</button><button class="btn btn-ghost btn-sm" onclick="resetStages()">↺ Reset default</button></div>
+  </div>
+</div>
+
+<div class="g2" style="margin-top:16px">
+  <div class="card"><div class="card-title">💾 Data Management</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📥 Export CSV (${curYear()})</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportJSON()">⬇ Backup JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="$('imp-json').click()">⬆ Restore JSON</button>
+      <input type="file" id="imp-json" accept=".json" class="hidden" onchange="importJSON(this)">
+      <button class="btn btn-err btn-sm" onclick="resetYear()">↺ Clear ${curYear()} Orders</button>
+    </div>
+  </div>
+  <div class="card" style="border-left:4px solid var(--err)"><div class="card-title">🔑 Login Credentials</div>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Signed in as <strong>${esc(sessionStorage.getItem('pm_user')||'admin')}</strong>.</p>
+    <div class="fg-grid">
+      <div class="fg"><label>New Username</label><input id="s-user" value="${esc(loadAuth().username)}"></div>
+      <div class="fg"><label>New Password</label><input type="password" id="s-pass" placeholder="Leave blank to keep"></div>
+    </div>
+    <div style="display:flex;gap:8px"><button class="btn btn-warn btn-sm" onclick="saveCreds()">🔑 Update Credentials</button><button class="btn btn-ghost btn-sm" onclick="doLogout()">⎋ Sign Out</button></div>
+  </div>
+</div>`;
+}
+function stagesEditorHTML(){const s=stages();return s.map((name,i)=>`<div class="chk-row"><span style="width:18px;text-align:center;color:var(--muted);font-size:11px">${i+1}</span><input value="${esc(name)}" onchange="renameStage(${i},this.value)"><button class="btn btn-ghost btn-sm" onclick="moveStage(${i},-1)" ${i===0?'disabled':''}>↑</button><button class="btn btn-ghost btn-sm" onclick="moveStage(${i},1)" ${i===s.length-1?'disabled':''}>↓</button><button class="del-x" onclick="removeStage(${i})" ${s.length<=2?'disabled':''}>×</button></div>`).join('')}
+function renameStage(i,v){v=v.trim();if(!v)return;PD.stages[i]=v;saveAll();$('stage-editor').innerHTML=stagesEditorHTML()}
+function moveStage(i,dir){const j=i+dir;if(j<0||j>=PD.stages.length)return;const a=PD.stages;[a[i],a[j]]=[a[j],a[i]];saveAll();$('stage-editor').innerHTML=stagesEditorHTML()}
+function addStage(){PD.stages.splice(PD.stages.length-1,0,'New Stage');saveAll();$('stage-editor').innerHTML=stagesEditorHTML()}
+function removeStage(i){if(PD.stages.length<=2)return;PD.stages.splice(i,1);saveAll();$('stage-editor').innerHTML=stagesEditorHTML()}
+function resetStages(){PD.stages=[...DEFAULT_STAGES];saveAll();$('stage-editor').innerHTML=stagesEditorHTML();toast('Stages reset')}
+function saveCloud(){PD.cloud={token:$('s-token').value.trim(),gistId:$('s-gist').value.trim(),autoSync:$('s-auto').checked};saveAll();toast('☁ Cloud config saved')}
+function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value;const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';toast('🔑 Credentials updated')}
+function exportJSON(){const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(PD,null,2));a.download='production_backup.json';a.click();toast('⬇ Backup saved')}
+function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.years)throw 0;PD=Object.assign(defaultData(),d);saveAll();render();toast('✅ Data restored')}catch(x){toast('Invalid backup file')}};r.readAsText(f);inp.value=''}
+function resetYear(){confirm2('Clear '+curYear()+' orders?','Removes all production orders for '+curYear()+'. Backup first if unsure.',()=>{PD.years[curYear()]={prods:[]};saveAll();render();toast('Cleared')})}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CLOUD SYNC — GitHub Gist (shared with Export Manager)
+// ════════════════════════════════════════════════════════════════════════════
+async function gistGet(){const c=PD.cloud||{};if(!c.gistId)throw new Error('No Gist ID set in Settings');
+  const h={'Accept':'application/vnd.github+json'};if(c.token)h['Authorization']='Bearer '+c.token;
+  const res=await fetch('https://api.github.com/gists/'+c.gistId,{headers:h});
+  if(!res.ok)throw new Error('Gist fetch failed: '+res.status);return res.json()}
+async function gistPatch(files){const c=PD.cloud||{};if(!c.token)throw new Error('Add a GitHub token in Settings');
+  const res=await fetch('https://api.github.com/gists/'+c.gistId,{method:'PATCH',headers:{'Authorization':'Bearer '+c.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'},body:JSON.stringify({files})});
+  if(!res.ok)throw new Error('Gist update failed: '+res.status);return res.json()}
+
+function prodFromShipment(y,s){const stage=s.cancelled?stages()[0]:(s.shipped==='Shipped'?stages()[stages().length-1]:stages()[0]);
+  return{id:uid(),year:y,month:s.month||'',orderNo:s.orderNo||'',party:s.party||'',dest:s.dest||'',product:'',
+    qty:'',vol:s.vol||'',value:s.iamt||s.oamt||'',exf:(/^\d{4}-\d{2}-\d{2}$/.test(s.exf)?s.exf:''),startDate:todayISO(),
+    stage:stage,progress:stageProgress(stage),priority:'Normal',checklist:[],materials:[],qc:{status:'Pending',notes:''},
+    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled}}
+
+function mergeOrders(y,shipments){const arr=getProds(y);const byNo={};arr.forEach(p=>{if(p.orderNo)byNo[p.orderNo]=p});
+  let added=0,updated=0;
+  shipments.forEach(s=>{if(!s.orderNo)return;const ex=byNo[s.orderNo];
+    if(!ex){const np=prodFromShipment(y,s);arr.push(np);byNo[s.orderNo]=np;added++}
+    else{ex.party=s.party||ex.party;ex.dest=s.dest||ex.dest;ex.vol=s.vol||ex.vol;ex.month=s.month||ex.month;
+      ex.value=s.iamt||s.oamt||ex.value;if(/^\d{4}-\d{2}-\d{2}$/.test(s.exf))ex.exf=s.exf;ex.cancelled=!!s.cancelled;
+      if(s.shipped==='Shipped'&&!isShippedStage(ex.stage)){ex.stage=stages()[stages().length-1];ex.progress=100}updated++}});
+  PD.years[y].prods=arr;
+}
+async function doPullOrders(){
+  setSync('warn','Importing orders…');
+  try{const g=await gistGet();const f=g.files&&g.files[GIST_EM_FILE];if(!f)throw new Error('No '+GIST_EM_FILE+' in this Gist — sync Export Manager first');
+    const data=JSON.parse(f.content);const years=data.years||{};
+    Object.keys(years).forEach(y=>{ensureYear(y);mergeOrders(y,years[y].shipments||[])});
+    saveAll();render();
+    const total=Object.values(years).reduce((a,yy)=>a+((yy.shipments||[]).length),0);
+    setSync('ok','Orders imported '+new Date().toLocaleTimeString());toast('✅ Imported orders from Export Manager ('+total+' shipments scanned)');
+  }catch(e){setSync('err','Import error');toast('Import error: '+e.message)}
+}
+async function doPushProduction(silent){
+  const c=PD.cloud||{};if(!c.token){if(!silent)toast('Add a GitHub token in Settings');return}
+  if(!silent)setSync('warn','Pushing…');
+  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages});
+    if(!c.gistId){const res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':'Bearer '+c.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'},body:JSON.stringify({description:'Production Manager Data',public:false,files:{[GIST_PROD_FILE]:{content:data}}})});
+      if(!res.ok)throw new Error('Create failed: '+res.status);const g=await res.json();PD.cloud.gistId=g.id;saveAll();
+      if(!silent)toast('☁ New Gist created: '+g.id+' — paste this same ID into Export Manager to link them');}
+    else{await gistPatch({[GIST_PROD_FILE]:{content:data}})}
+    setSync('ok','Pushed '+new Date().toLocaleTimeString());if(!silent)toast('☁ Production data pushed');
+  }catch(e){setSync('err','Push error');if(!silent)toast('Push error: '+e.message)}
+}
+async function doPullProduction(){
+  setSync('warn','Pulling…');
+  try{const g=await gistGet();const f=g.files&&g.files[GIST_PROD_FILE];if(!f)throw new Error('No '+GIST_PROD_FILE+' yet — push first');
+    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;
+    saveAll();render();setSync('ok','Pulled '+new Date().toLocaleTimeString());toast('☁ Production data pulled');
+  }catch(e){setSync('err','Pull error');toast('Pull error: '+e.message)}
+}
+// Safe read-modify-write: only updates each matched order's `shipped` field inside exportmanager.json
+async function doSyncStatusBack(){
+  const c=PD.cloud||{};if(!c.token){toast('Add a GitHub token in Settings');return}
+  confirm2('Update Export Manager?','This updates the shipped/in-progress status of matching orders inside Export Manager, based on your production stages. All other export data is left untouched.',async()=>{
+  setSync('warn','Updating Export Manager…');
+  try{const g=await gistGet();const f=g.files&&g.files[GIST_EM_FILE];if(!f)throw new Error('No '+GIST_EM_FILE+' found');
+    const data=JSON.parse(f.content);const years=data.years||{};let changed=0;
+    Object.keys(PD.years).forEach(y=>{const prods=PD.years[y].prods||[];if(!years[y]||!years[y].shipments)return;
+      const map={};prods.forEach(p=>{if(p.orderNo)map[p.orderNo]=p});
+      years[y].shipments.forEach(s=>{const p=map[s.orderNo];if(!p)return;
+        const done=isShippedStage(p.stage);if(done&&s.shipped!=='Shipped'){s.shipped='Shipped';changed++}
+        else if(!done&&s.shipped==='Shipped'){delete s.shipped;changed++}})});
+    await gistPatch({[GIST_EM_FILE]:{content:JSON.stringify(data)}});
+    setSync('ok','Updated '+new Date().toLocaleTimeString());toast('⤴ Updated '+changed+' order status(es) in Export Manager');
+  }catch(e){setSync('err','Update error');toast('Update error: '+e.message)}
+  },'Update Export Manager','btn-warn');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════════════════════════════════
+async function bootApp(){await loadData();$('app').classList.remove('hidden');
+  const c=PD.cloud||{};setSync(c.gistId?'ok':'',c.gistId?'Linked · '+(c.autoSync?'auto':'manual'):'Not linked');
+  render();}
+(function init(){const t=localStorage.getItem('pm_theme')||'light';$('root-html').setAttribute('data-theme',t);
+  if(sessionStorage.getItem('pm_session')==='ok'){$('login-screen').classList.add('hidden');$('topbar-user').textContent='👤 '+(sessionStorage.getItem('pm_user')||'admin');bootApp();}
+  else{$('login-screen').classList.remove('hidden');setTimeout(()=>$('l-user').focus(),100)}
+})();
+</script>
+</body>
+</html>
