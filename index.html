@@ -241,6 +241,9 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
 <!-- Supplier editor modal -->
 <div class="ov" id="sup-ov"><div class="modal" style="width:640px"><div class="mh"><h3 id="sup-title">Supplier</h3><button class="xbtn" onclick="closeModal('sup-ov')">×</button></div><div class="mb" id="sup-body"></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('sup-ov')">Cancel</button><button class="btn btn-pri" onclick="saveSupplier()">💾 Save Supplier</button></div></div></div>
 
+<!-- Copy-to-clipboard fallback modal -->
+<div class="ov" id="cp-ov"><div class="modal" style="width:560px"><div class="mh"><h3>Copy weekly update</h3><button class="xbtn" onclick="closeModal('cp-ov')">×</button></div><div class="mb"><p style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Select all and copy (Ctrl/Cmd+C), then paste into WhatsApp or email.</p><textarea id="cp-text" rows="12" style="width:100%;font-family:monospace;font-size:12px" onclick="this.select()"></textarea></div><div class="mf"><button class="btn btn-pri" onclick="closeModal('cp-ov')">Done</button></div></div></div>
+
 <!-- Confirm modal -->
 <div class="ov" id="cf-ov"><div class="modal" style="width:430px"><div class="mh"><h3 id="cf-title">Confirm</h3><button class="xbtn" onclick="closeModal('cf-ov')">×</button></div><div class="mb"><p id="cf-msg" style="font-size:13.5px"></p></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('cf-ov')">Cancel</button><button class="btn btn-err" id="cf-ok">Confirm</button></div></div></div>
 
@@ -818,16 +821,19 @@ function supplierCard(s,wk){
   const overdue=active.filter(p=>{const d=daysUntil(p.exf);return d!==null&&d<0}).length;
   const wkVals=active.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
   const wkAvg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
+  const cap=+s.capacity||0;const util=cap?Math.round(units/cap*100):null;
+  const utilColor=util==null?'inherit':util>100?'var(--err)':util>=85?'var(--warn)':'var(--ok)';
   return `<div class="card" style="margin-bottom:14px">
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
     <div><div style="font-size:16px;font-weight:800;color:var(--htxt)">👷 ${esc(s.name)} ${s.status==='Inactive'?'<span class="badge b-mut">Inactive</span>':''}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:3px">${s.specialty?'<span class="tag">'+esc(s.specialty)+'</span> ':''}${s.location?'📍 '+esc(s.location)+' ':''}${s.contact?'· 👤 '+esc(s.contact):''}${s.phone?' · 📞 '+esc(s.phone):''}${s.email?' · ✉️ '+esc(s.email):''}</div></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="printSupplierWeek('${s.id}')">🖨 Weekly Report</button><button class="btn btn-ghost btn-sm" onclick="openSupplier('${s.id}')">✏️ Edit</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="copySupplierWeek('${s.id}')">💬 Copy Update</button><button class="btn btn-ghost btn-sm" onclick="printSupplierWeek('${s.id}')">🖨 Weekly Report</button><button class="btn btn-ghost btn-sm" onclick="openSupplier('${s.id}')">✏️ Edit</button></div>
   </div>
   <div style="display:flex;gap:20px;flex-wrap:wrap;margin:14px 0;align-items:center">
     <div><div style="font-size:22px;font-weight:800">${active.length}</div><div style="color:var(--muted);font-size:11.5px">active orders</div></div>
     <div><div style="font-size:22px;font-weight:800">${units.toLocaleString()}</div><div style="color:var(--muted);font-size:11.5px">units</div></div>
     <div><div style="font-size:22px;font-weight:800;color:${overdue?'var(--err)':'inherit'}">${overdue}</div><div style="color:var(--muted);font-size:11.5px">overdue</div></div>
+    <div title="${cap?units.toLocaleString()+' active units of '+cap.toLocaleString()+' units/month capacity':'Set monthly capacity in the supplier profile'}"><div style="font-size:22px;font-weight:800;color:${utilColor}">${util==null?'—':util+'%'}</div><div style="color:var(--muted);font-size:11.5px">capacity used${util!=null&&util>100?' ⚠️':''}</div></div>
     <div style="flex:1;min-width:150px"><div style="color:var(--muted);font-size:11.5px;margin-bottom:4px">Avg progress this week — <strong>${wkAvg}%</strong></div><div class="pbar"><span style="width:${wkAvg}%"></span></div></div>
   </div>
   ${active.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">📈 Weekly progress trend — avg % (last 6 weeks)</div>${supplierTrendBars(s)}</div>`:''}
@@ -846,6 +852,27 @@ function assignSupplier(orderId,supId){const p=findProd(orderId);if(!p)return;p.
 function setWeekProgress(orderId,wk,val){const p=findProd(orderId);if(!p)return;if(!p.weekly)p.weekly={};
   if(val===''||val==null){delete p.weekly[wk]}else{const n=Math.max(0,Math.min(100,+val||0));p.weekly[wk]=Object.assign({},p.weekly[wk],{progress:n})}
   p.updatedAt=Date.now();saveAll();toast('Week progress saved')}
+
+// ── WhatsApp / email-ready text export of a supplier's weekly targets ─────────
+function buildSupplierWeekText(sid){const s=findSupplier(sid);if(!s)return '';const wk=curWeekKey();
+  const orders=supplierOrders(sid).filter(p=>!isShippedStage(p.stage));const L=[];
+  L.push('*'+s.name+' — Weekly Production Update*');
+  L.push('Week: '+weekRangeLabel(selWeek));L.push('');
+  if(!orders.length)L.push('No active orders allocated.');
+  orders.forEach((p,i)=>{const w=p.weekly&&p.weekly[wk];const wp=w&&w.progress!=null?w.progress+'%':'—';const d=daysUntil(p.exf);
+    const due=p.exf?(fmtDate(p.exf)+(d!=null?(d<0?' ('+Math.abs(d)+'d LATE)':d===0?' (today)':' (in '+d+'d)'):'')):'no date';
+    L.push((i+1)+'. '+(p.orderNo||'—')+' · '+(p.party||''));
+    L.push('   '+(p.product||'(item)')+(p.qty?' — '+(+p.qty).toLocaleString()+' pcs':''));
+    L.push('   Stage: '+p.stage+' | This week: '+wp+' | Due: '+due);
+    if(w&&w.note)L.push('   Note: '+w.note);});
+  if(orders.length){const v=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+    L.push('');L.push('Avg progress this week: '+Math.round(v.reduce((a,b)=>a+b,0)/v.length)+'% across '+orders.length+' order(s)');}
+  return L.join('\n');}
+function fallbackCopy(txt,cb){const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}document.body.removeChild(ta);if(ok&&cb)cb();else showCopyModal(txt);}
+function copySupplierWeek(sid){const txt=buildSupplierWeekText(sid);const done=()=>toast('📋 Copied — paste into WhatsApp or email');
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,()=>fallbackCopy(txt,done))}else fallbackCopy(txt,done);}
+// Last resort if clipboard is blocked: show the text in a modal to copy manually
+function showCopyModal(txt){$('cp-text').value=txt;openModal('cp-ov')}
 
 // ── Printable weekly reports (for sharing targets/progress with each factory) ──
 const _supWeekHead='<thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Target Qty</th><th>Stage</th><th>Overall</th><th>This Week</th><th>Ex-Factory</th><th>Week Note</th></tr></thead>';

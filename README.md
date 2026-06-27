@@ -24,6 +24,9 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
   Unallocated orders are flagged for quick assignment. Filter the Orders table by
   supplier, see a **Production by Supplier** breakdown on the dashboard, and print
   per-supplier (or all-supplier) **weekly progress reports** for sharing with factories.
+  Each card also shows a **capacity-utilization** indicator (active units vs. monthly
+  capacity, colour-coded, flags overload) and a **💬 Copy Update** button that copies a
+  WhatsApp/email-ready weekly summary of that supplier's orders, targets, and progress.
 - **Deadlines** — active orders grouped Overdue / This week / Next 30 days / Later.
 - **Reports** — printable Production Status, Deadline/WIP, and Outstanding Materials.
 - **Configurable pipeline** — rename/reorder/add/remove stages (the last stage = "shipped").
