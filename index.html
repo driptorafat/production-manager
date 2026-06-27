@@ -279,6 +279,9 @@ function stages(){return (PD.stages&&PD.stages.length)?PD.stages:DEFAULT_STAGES}
 function stageIdx(name){const i=stages().indexOf(name);return i<0?0:i}
 function stageProgress(name){const s=stages();const i=s.indexOf(name);if(i<0)return 0;if(s.length<=1)return 100;return Math.round(i/(s.length-1)*100)}
 function isShippedStage(name){return name===stages()[stages().length-1]}
+// An order is "closed" (done, not active, never flagged late) when its production
+// stage is the final stage OR it's marked fully paid/complete in Export Manager.
+function isClosed(p){return isShippedStage(p.stage)||!!p.closed}
 
 // ── Year / order data accessors ────────────────────────────────────────────
 function ensureYear(y){if(!PD.years[y])PD.years[y]={prods:[]}}
@@ -386,9 +389,9 @@ const STAGE_COLORS=['#94a3b8','#f59e0b','#3b82f6','#a855f7','#06b6d4','#10b981',
 
 function renderDashboard(){
   const y=curYear();const all=getProds(y);
-  const active=all.filter(p=>!p.cancelled&&!isShippedStage(p.stage));
-  const shipped=all.filter(p=>!p.cancelled&&isShippedStage(p.stage));
-  const inProd=all.filter(p=>!p.cancelled&&['Material Sourcing','In Production','Quality Check','Packing','Ready to Ship'].includes(p.stage));
+  const active=all.filter(p=>!p.cancelled&&!isClosed(p));
+  const shipped=all.filter(p=>!p.cancelled&&isClosed(p));
+  const inProd=all.filter(p=>!p.cancelled&&!isClosed(p)&&['Material Sourcing','In Production','Quality Check','Packing','Ready to Ship'].includes(p.stage));
   let overdue=0,dueSoon=0,onTime=0,late=0;
   active.forEach(p=>{const d=daysUntil(p.exf);if(d!==null){if(d<0)overdue++;else if(d<=7)dueSoon++}});
   shipped.forEach(p=>{const d=daysUntil(p.exf);if(p.shipDate&&p.exf){if(p.shipDate<=p.exf)onTime++;else late++}});
@@ -416,7 +419,7 @@ ${all.length===0?`<div class="note">👋 No production orders yet for ${y}. Clic
   ${kpi('Active Orders',active.length,inProd.length+' in production','')}
   ${kpi('Due ≤ 7 days',dueSoon,'approaching ex-factory','warn')}
   ${kpi('Overdue',overdue,overdue?'needs attention':'all on track',overdue?'err':'ok')}
-  ${kpi('Shipped',shipped.length,'completed in '+y,'ok')}
+  ${kpi('Completed',shipped.length,'shipped or paid in '+y,'ok')}
   ${kpi('On-time Rate',otp===null?'—':otp+'%',(onTime+late)+' shipped w/ dates','acc')}
   ${kpi('Active Units',totalQty.toLocaleString(),fUSD(totalVal)+' order value','')}
 </div>
@@ -456,8 +459,8 @@ function renderBoard(){
   ${items.map(p=>kcard(p)).join('')||'<div style="color:var(--muted);font-size:11.5px;text-align:center;padding:14px 0">—</div>'}
   </div></div>`}).join('')}</div>`;
 }
-function kcard(p){const done=isShippedStage(p.stage);const d=daysUntil(p.exf);const cls=done?'due-ok':d===null?'due-ok':d<0?'due-over':d<=7?'due-soon':'due-ok';
-  const lbl=done?'✓ shipped':d===null?(p.exf||'no date'):d<0?Math.abs(d)+'d late':d===0?'today':d+'d';
+function kcard(p){const done=isClosed(p);const d=daysUntil(p.exf);const cls=done?'due-ok':d===null?'due-ok':d<0?'due-over':d<=7?'due-soon':'due-ok';
+  const lbl=done?(isShippedStage(p.stage)?'✓ shipped':'✓ paid'):d===null?(p.exf||'no date'):d<0?Math.abs(d)+'d late':d===0?'today':d+'d';
   return `<div class="kcard" draggable="true" ondragstart="dragStart(event,'${p.id}')" ondragend="this.classList.remove('drag')" onclick="openOrder('${p.id}')">
     <div class="kcard-top"><div><div class="kcard-ono">${esc(p.orderNo||'—')}</div><div class="kcard-party">${esc(p.party||'')}</div></div>
       <span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></div>
@@ -503,7 +506,7 @@ function paintOrders(){
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>No orders match. <a href="#" onclick="openOrder(null);return false">Add one</a> or import from Export Manager.</div>';return}
   el.innerHTML=`<div class="tbl-wrap"><table><thead><tr>
     <th>Order #</th><th>Buyer</th><th>Supplier</th><th>Product</th><th>Dest</th><th>Qty</th><th>Stage</th><th style="width:120px">Progress</th><th>Ex-Factory</th><th>Priority</th><th></th></tr></thead><tbody>
-    ${list.map(p=>{const done=isShippedStage(p.stage);const d=daysUntil(p.exf);const dcls=(done||p.cancelled||d===null)?'':d<0?'b-err':d<=7?'b-warn':'';
+    ${list.map(p=>{const done=isClosed(p);const d=daysUntil(p.exf);const dcls=(done||p.cancelled||d===null)?'':d<0?'b-err':d<=7?'b-warn':'';
       const dtxt=d<0?Math.abs(d)+'d late':d===0?'today':'in '+d+'d';
       return `<tr style="cursor:pointer" onclick="openOrder('${p.id}')">
       <td><strong>${esc(p.orderNo||'—')}</strong>${p.cancelled?' <span class="badge b-err">Cancelled</span>':''}${p.source==='export-manager'?' <span class="tag" title="Imported from Export Manager">🔗</span>':''}</td>
@@ -511,7 +514,7 @@ function paintOrders(){
       <td>${p.qty?(+p.qty).toLocaleString():'—'}</td>
       <td><span class="badge b-stage">${esc(p.stage)}</span></td>
       <td><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
-      <td>${fmtDate(p.exf)} ${done?'<span class="badge b-ok">✓ shipped</span>':dcls?`<span class="badge ${dcls}">${dtxt}</span>`:''}</td>
+      <td>${fmtDate(p.exf)} ${done?'<span class="badge b-ok">✓ '+(isShippedStage(p.stage)?'shipped':'paid')+'</span>':dcls?`<span class="badge ${dcls}">${dtxt}</span>`:''}</td>
       <td><span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></td>
       <td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openOrder('${p.id}')">✏️</button></td></tr>`}).join('')}
     </tbody></table></div>`;
@@ -654,7 +657,7 @@ function deleteOrder(){const id=$('of-id').value;confirm2('Delete order?','This 
 //  DEADLINES / CALENDAR
 // ════════════════════════════════════════════════════════════════════════════
 function renderCalendar(){
-  const y=curYear();const active=getProds(y).filter(p=>!p.cancelled&&!isShippedStage(p.stage));
+  const y=curYear();const active=getProds(y).filter(p=>!p.cancelled&&!isClosed(p));
   const groups={Overdue:[],'This week':[],'Next 30 days':[],Later:[],'No date':[]};
   active.forEach(p=>{const d=daysUntil(p.exf);if(d===null)groups['No date'].push(p);else if(d<0)groups['Overdue'].push(p);else if(d<=7)groups['This week'].push(p);else if(d<=30)groups['Next 30 days'].push(p);else groups['Later'].push(p)});
   Object.values(groups).forEach(g=>g.sort((a,b)=>{const x=daysUntil(a.exf),z=daysUntil(b.exf);return (x===null?9e9:x)-(z===null?9e9:z)}));
@@ -688,10 +691,10 @@ function printWindow(title,body){const w=window.open('','_blank');w.document.wri
 function printStatus(){const list=getProds(curYear()).filter(p=>!p.cancelled).sort((a,b)=>stageIdx(a.stage)-stageIdx(b.stage));
   const rows=list.map(p=>`<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${p.qty?(+p.qty).toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td>${fmtDate(p.exf)}</td><td>${p.priority||'Normal'}</td></tr>`).join('');
   printWindow('Production Status Report',`<table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Qty</th><th>Stage</th><th>Progress</th><th>Ex-Factory</th><th>Priority</th></tr></thead><tbody>${rows}</tbody></table>`)}
-function printDeadlines(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isShippedStage(p.stage)).sort((a,b)=>{const x=daysUntil(a.exf),z=daysUntil(b.exf);return (x===null?9e9:x)-(z===null?9e9:z)});
+function printDeadlines(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isClosed(p)).sort((a,b)=>{const x=daysUntil(a.exf),z=daysUntil(b.exf);return (x===null?9e9:x)-(z===null?9e9:z)});
   const rows=list.map(p=>{const d=daysUntil(p.exf);const lbl=d===null?'—':d<0?Math.abs(d)+'d LATE':d===0?'today':'in '+d+'d';return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.stage)}</td><td>${fmtDate(p.exf)}</td><td class="${d!==null&&d<0?'over':''}">${lbl}</td></tr>`}).join('');
   printWindow('Deadline / WIP Report',`<table><thead><tr><th>Order #</th><th>Buyer</th><th>Stage</th><th>Ex-Factory</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`)}
-function printMaterials(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isShippedStage(p.stage));let rows='';
+function printMaterials(){const list=getProds(curYear()).filter(p=>!p.cancelled&&!isClosed(p));let rows='';
   list.forEach(p=>(p.materials||[]).forEach(m=>{const out=(+m.req||0)-(+m.recv||0);if(out>0)rows+=`<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(m.name||'')}</td><td>${(+m.req||0).toLocaleString()} ${esc(m.unit||'')}</td><td>${(+m.recv||0).toLocaleString()} ${esc(m.unit||'')}</td><td class="over">${out.toLocaleString()} ${esc(m.unit||'')}</td></tr>`}));
   printWindow('Outstanding Materials',`<table><thead><tr><th>Order #</th><th>Material</th><th>Needed</th><th>Received</th><th>Outstanding</th></tr></thead><tbody>${rows||'<tr><td colspan=5>No outstanding materials.</td></tr>'}</tbody></table>`)}
 
@@ -793,7 +796,7 @@ function weekToday(){selWeek=mondayOf(new Date());render()}
 function renderSuppliers(){
   const y=curYear();const sups=getSuppliers();const wk=curWeekKey();
   const allActive=getProds(y).filter(p=>!p.cancelled);
-  const unalloc=allActive.filter(p=>!(p.allocations||[]).length&&!isShippedStage(p.stage));
+  const unalloc=allActive.filter(p=>!(p.allocations||[]).length&&!isClosed(p));
   return `
 <div class="sh"><div><div class="sh-t">Suppliers — ${y}</div><div class="sh-s">${sups.length} supplier${sups.length!==1?'s':''} · production allocation & weekly progress</div></div>
   <button class="btn btn-pri btn-sm" onclick="openSupplier(null)">+ Add Supplier</button></div>
@@ -819,7 +822,7 @@ ${unalloc.length?`<div class="card" style="margin-top:16px;border-left:4px solid
 }
 
 function supplierTrendBars(s){
-  const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));const N=6;const bars=[];
+  const orders=supplierOrders(s.id).filter(p=>!isClosed(p));const N=6;const bars=[];
   for(let i=N-1;i>=0;i--){const d=new Date(selWeek);d.setDate(d.getDate()-i*7);const wk=isoWeekKey(d);
     const vals=orders.map(p=>{const w=getWeek(p,s.id,wk);return w&&w.progress!=null?+w.progress:0});
     const avg=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
@@ -831,8 +834,8 @@ function supplierTrendBars(s){
 }
 function supplierBreakdownCard(y){
   const sups=getSuppliers();
-  const rows=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{name:s.name,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0),un:false}}).filter(r=>r.orders>0);
-  const un=getProds(y).filter(p=>!p.cancelled&&!(p.allocations||[]).length&&!isShippedStage(p.stage));
+  const rows=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isClosed(p));return{name:s.name,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0),un:false}}).filter(r=>r.orders>0);
+  const un=getProds(y).filter(p=>!p.cancelled&&!(p.allocations||[]).length&&!isClosed(p));
   if(un.length)rows.push({name:'— Unallocated —',orders:un.length,units:un.reduce((a,p)=>a+(+p.qty||0),0),un:true});
   rows.sort((a,b)=>b.units-a.units||b.orders-a.orders);
   const maxU=Math.max(1,...rows.map(r=>r.units));
@@ -845,7 +848,7 @@ function supplierBreakdownCard(y){
   </div>`;
 }
 function supplierListTable(y){const sups=getSuppliers();if(!sups.length)return '';
-  const data=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{s,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0)}});
+  const data=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isClosed(p));return{s,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0)}});
   const totalUnits=data.reduce((a,d)=>a+d.units,0);
   data.sort((a,b)=>b.units-a.units||a.s.name.localeCompare(b.s.name));
   return `<div class="card" style="margin-bottom:16px"><div class="card-title">📋 Supplier List (${sups.length})</div>
@@ -865,7 +868,7 @@ function supplierListTable(y){const sups=getSuppliers();if(!sups.length)return '
 }
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);
-  const active=orders.filter(p=>!isShippedStage(p.stage));
+  const active=orders.filter(p=>!isClosed(p));
   const units=active.reduce((a,p)=>a+allocQty(p,s.id),0);
   const overdue=active.filter(p=>{const d=daysUntil(p.exf);return d!==null&&d<0}).length;
   const wkVals=active.map(p=>{const w=getWeek(p,s.id,wk);return w&&w.progress!=null?+w.progress:0});
@@ -905,7 +908,7 @@ function setWeekProgress(orderId,sid,wk,val){const p=findProd(orderId);if(!p)ret
 
 // ── WhatsApp / email-ready text export of a supplier's weekly targets ─────────
 function buildSupplierWeekText(sid){const s=findSupplier(sid);if(!s)return '';const wk=curWeekKey();
-  const orders=supplierOrders(sid).filter(p=>!isShippedStage(p.stage));const L=[];
+  const orders=supplierOrders(sid).filter(p=>!isClosed(p));const L=[];
   L.push('*'+s.name+' — Weekly Production Update*');
   L.push('Week: '+weekRangeLabel(selWeek));L.push('');
   if(!orders.length)L.push('No active orders allocated.');
@@ -929,7 +932,7 @@ const _supWeekHead='<thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th
 function _supWeekRow(p,sid,wk){const w=getWeek(p,sid,wk);const wp=w&&w.progress!=null?w.progress+'%':'—';const wn=w&&w.note?esc(w.note):'';const d=daysUntil(p.exf);const late=d!==null&&d<0;const q=allocQty(p,sid);
   return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${q?q.toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td><strong>${wp}</strong></td><td class="${late?'over':''}">${fmtDate(p.exf)}${late?' ('+Math.abs(d)+'d late)':''}</td><td>${wn}</td></tr>`}
 function printSupplierWeek(sid){const s=findSupplier(sid);if(!s)return;const wk=curWeekKey();
-  const orders=supplierOrders(sid).filter(p=>!isShippedStage(p.stage));
+  const orders=supplierOrders(sid).filter(p=>!isClosed(p));
   const units=orders.reduce((a,p)=>a+allocQty(p,sid),0);
   const wkVals=orders.map(p=>{const w=getWeek(p,sid,wk);return w&&w.progress!=null?+w.progress:0});
   const avg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
@@ -940,7 +943,7 @@ function printSupplierWeek(sid){const s=findSupplier(sid);if(!s)return;const wk=
   printWindow('Weekly Production Report — '+s.name,body);
 }
 function printAllSuppliersWeek(){const wk=curWeekKey();const sups=getSuppliers();let body=`<div style="margin:0 0 6px;font-size:13px"><strong>Week:</strong> ${weekRangeLabel(selWeek)} (${wk})</div>`;let any=false;
-  sups.forEach(s=>{const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));if(!orders.length)return;any=true;
+  sups.forEach(s=>{const orders=supplierOrders(s.id).filter(p=>!isClosed(p));if(!orders.length)return;any=true;
     body+=`<h2 style="font-size:15px;margin:18px 0 6px">👷 ${esc(s.name)}${s.location?' <span style="font-weight:400;color:#666;font-size:12px">— '+esc(s.location)+'</span>':''}</h2><table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,s.id,wk)).join('')}</tbody></table>`});
   if(!any)body+='<p>No suppliers have active allocated orders.</p>';
   printWindow('Supplier Weekly Progress',body);
@@ -992,14 +995,14 @@ function prodFromShipment(y,s){const stage=s.cancelled?stages()[0]:(s.shipped===
   return{id:uid(),year:y,month:s.month||'',orderNo:s.orderNo||'',party:s.party||'',dest:s.dest||'',product:'',
     qty:'',vol:s.vol||'',value:s.iamt||s.oamt||'',exf:(/^\d{4}-\d{2}-\d{2}$/.test(s.exf)?s.exf:''),startDate:todayISO(),
     stage:stage,progress:stageProgress(stage),priority:'Normal',checklist:[],materials:[],qc:{status:'Pending',notes:''},
-    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled,allocations:[],weekly:{}}}
+    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled,closed:(s.pay==='Full Paid'),allocations:[],weekly:{}}}
 
 function mergeOrders(y,shipments){const arr=getProds(y);const byNo={};arr.forEach(p=>{if(p.orderNo)byNo[p.orderNo]=p});
   let added=0,updated=0;
   shipments.forEach(s=>{if(!s.orderNo)return;const ex=byNo[s.orderNo];
     if(!ex){const np=prodFromShipment(y,s);arr.push(np);byNo[s.orderNo]=np;added++}
     else{ex.party=s.party||ex.party;ex.dest=s.dest||ex.dest;ex.vol=s.vol||ex.vol;ex.month=s.month||ex.month;
-      ex.value=s.iamt||s.oamt||ex.value;if(/^\d{4}-\d{2}-\d{2}$/.test(s.exf))ex.exf=s.exf;ex.cancelled=!!s.cancelled;
+      ex.value=s.iamt||s.oamt||ex.value;if(/^\d{4}-\d{2}-\d{2}$/.test(s.exf))ex.exf=s.exf;ex.cancelled=!!s.cancelled;ex.closed=(s.pay==='Full Paid');
       if(s.shipped==='Shipped'&&!isShippedStage(ex.stage)){ex.stage=stages()[stages().length-1];ex.progress=100}updated++}});
   PD.years[y].prods=arr;
 }
