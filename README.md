@@ -16,7 +16,11 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
 - **Production Board (Kanban)** — drag order cards between stages; progress auto-updates.
 - **Orders** — searchable/filterable table with progress bars, deadlines, priority.
 - **Order editor** — stage pipeline, production checklist, raw-material/BOM tracking
-  (needed vs received), quality-check status, photos, notes, priority.
+  (needed vs received), quality-check status, photos, notes, priority, supplier allocation.
+- **Suppliers** — supplier/factory database (contact, location, specialty, capacity).
+  See which supplier is making which orders, allocate orders to suppliers, and record
+  each order's **weekly progress %** per supplier with a week-by-week navigator and
+  per-supplier averages. Unallocated orders are flagged for quick assignment.
 - **Deadlines** — active orders grouped Overdue / This week / Next 30 days / Later.
 - **Reports** — printable Production Status, Deadline/WIP, and Outstanding Materials.
 - **Configurable pipeline** — rename/reorder/add/remove stages (the last stage = "shipped").

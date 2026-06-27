@@ -238,6 +238,9 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
 <!-- Order detail modal -->
 <div class="ov" id="ord-ov"><div class="modal"><div class="mh"><h3 id="ord-title">Production Order</h3><button class="xbtn" onclick="closeModal('ord-ov')">×</button></div><div class="mb" id="ord-body"></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('ord-ov')">Cancel</button><button class="btn btn-pri" onclick="saveOrder()">💾 Save Order</button></div></div></div>
 
+<!-- Supplier editor modal -->
+<div class="ov" id="sup-ov"><div class="modal" style="width:640px"><div class="mh"><h3 id="sup-title">Supplier</h3><button class="xbtn" onclick="closeModal('sup-ov')">×</button></div><div class="mb" id="sup-body"></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('sup-ov')">Cancel</button><button class="btn btn-pri" onclick="saveSupplier()">💾 Save Supplier</button></div></div></div>
+
 <!-- Confirm modal -->
 <div class="ov" id="cf-ov"><div class="modal" style="width:430px"><div class="mh"><h3 id="cf-title">Confirm</h3><button class="xbtn" onclick="closeModal('cf-ov')">×</button></div><div class="mb"><p id="cf-msg" style="font-size:13.5px"></p></div><div class="mf"><button class="btn btn-ghost" onclick="closeModal('cf-ov')">Cancel</button><button class="btn btn-err" id="cf-ok">Confirm</button></div></div></div>
 
@@ -291,7 +294,7 @@ function _idbGet(k){return new Promise((res,rej)=>{const t=_idb.transaction('kv'
 function _idbSet(k,v){return new Promise((res,rej)=>{const t=_idb.transaction('kv','readwrite').objectStore('kv').put(v,k);t.onsuccess=()=>res();t.onerror=()=>rej(t.error)})}
 
 function defaultData(){const y=String(new Date().getFullYear());return{currentYear:y,years:{[y]:{prods:[]}},
-  cloud:{token:'',gistId:'',autoSync:false},stages:[...DEFAULT_STAGES]}}
+  cloud:{token:'',gistId:'',autoSync:false},stages:[...DEFAULT_STAGES],suppliers:[]}}
 
 async function loadData(){
   let d=null;
@@ -302,6 +305,7 @@ async function loadData(){
   PD=Object.assign(defaultData(),d);
   if(!PD.cloud)PD.cloud={token:'',gistId:'',autoSync:false};
   if(!PD.stages||!PD.stages.length)PD.stages=[...DEFAULT_STAGES];
+  if(!PD.suppliers)PD.suppliers=[];
 }
 let _saveT=null;
 function saveAll(){
@@ -339,7 +343,7 @@ function setTheme(t){$('root-html').setAttribute('data-theme',t);localStorage.se
 
 // ── Routing ──────────────────────────────────────────────────────────────────
 const ROUTES=[['dashboard','📊','Dashboard'],['board','🗂️','Production Board'],['orders','📋','Orders'],
-  ['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
+  ['suppliers','👷','Suppliers'],['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
 let route='dashboard';
 function go(r){route=r;document.getElementById('sidebar').classList.remove('open');render()}
 function renderNav(){$('nav').innerHTML=ROUTES.map(([id,ic,lbl])=>
@@ -358,6 +362,7 @@ function render(){
   if(route==='dashboard')c.innerHTML=renderDashboard();
   else if(route==='board')c.innerHTML=renderBoard();
   else if(route==='orders')c.innerHTML=renderOrders();
+  else if(route==='suppliers'){c.innerHTML=renderSuppliers()}
   else if(route==='calendar')c.innerHTML=renderCalendar();
   else if(route==='reports')c.innerHTML=renderReports();
   else if(route==='settings')c.innerHTML=renderSettings();
@@ -451,7 +456,7 @@ function kcard(p){const d=daysUntil(p.exf);const cls=d===null?'due-ok':d<0?'due-
       <span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></div>
     ${p.product?`<div style="font-size:11.5px;color:var(--muted);margin-top:5px">📦 ${esc(p.product)}${p.qty?' · '+(+p.qty).toLocaleString()+' pcs':''}</div>`:''}
     <div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div>
-    <div class="kcard-meta"><span class="kcard-due ${cls}">📅 ${esc(lbl)}</span>${p.dest?`<span class="tag">${esc(p.dest)}</span>`:''}</div>
+    <div class="kcard-meta"><span class="kcard-due ${cls}">📅 ${esc(lbl)}</span>${p.dest?`<span class="tag">${esc(p.dest)}</span>`:''}${p.supplier?`<span class="tag">👷 ${esc(supplierName(p.supplier))}</span>`:''}</div>
   </div>`}
 function dragStart(e,id){e.dataTransfer.setData('id',id);e.target.classList.add('drag')}
 function dropCard(e,stageName){e.preventDefault();document.querySelectorAll('.col-body').forEach(c=>c.classList.remove('dragover'));
@@ -488,12 +493,12 @@ function paintOrders(){
   const list=filteredOrders();const el=$('ord-table');if(!el)return;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>No orders match. <a href="#" onclick="openOrder(null);return false">Add one</a> or import from Export Manager.</div>';return}
   el.innerHTML=`<div class="tbl-wrap"><table><thead><tr>
-    <th>Order #</th><th>Buyer</th><th>Product</th><th>Dest</th><th>Qty</th><th>Stage</th><th style="width:120px">Progress</th><th>Ex-Factory</th><th>Priority</th><th></th></tr></thead><tbody>
+    <th>Order #</th><th>Buyer</th><th>Supplier</th><th>Product</th><th>Dest</th><th>Qty</th><th>Stage</th><th style="width:120px">Progress</th><th>Ex-Factory</th><th>Priority</th><th></th></tr></thead><tbody>
     ${list.map(p=>{const d=daysUntil(p.exf);const dcls=d===null?'':d<0?'b-err':d<=7?'b-warn':'';
       const dtxt=d===null?fmtDate(p.exf):d<0?Math.abs(d)+'d late':d===0?'today':'in '+d+'d';
       return `<tr style="cursor:pointer" onclick="openOrder('${p.id}')">
       <td><strong>${esc(p.orderNo||'—')}</strong>${p.cancelled?' <span class="badge b-err">Cancelled</span>':''}${p.source==='export-manager'?' <span class="tag" title="Imported from Export Manager">🔗</span>':''}</td>
-      <td>${esc(p.party||'—')}</td><td>${esc(p.product||'—')}</td><td>${esc(p.dest||'—')}</td>
+      <td>${esc(p.party||'—')}</td><td>${p.supplier?esc(supplierName(p.supplier)):'<span style="color:var(--muted)">—</span>'}</td><td>${esc(p.product||'—')}</td><td>${esc(p.dest||'—')}</td>
       <td>${p.qty?(+p.qty).toLocaleString():'—'}</td>
       <td><span class="badge b-stage">${esc(p.stage)}</span></td>
       <td><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
@@ -508,7 +513,7 @@ function paintOrders(){
 // ════════════════════════════════════════════════════════════════════════════
 function blankProd(){return{id:uid(),year:curYear(),month:MONTHS[new Date().getMonth()],orderNo:'',party:'',dest:'',
   product:'',qty:'',vol:'',exf:'',value:'',stage:stages()[0],priority:'Normal',startDate:todayISO(),
-  checklist:[],materials:[],qc:{status:'Pending',notes:''},photos:[],notes:'',source:'manual',cancelled:false}}
+  checklist:[],materials:[],qc:{status:'Pending',notes:''},photos:[],notes:'',source:'manual',cancelled:false,supplier:'',weekly:{}}}
 let draftChecklist=[],draftMaterials=[];
 function openOrder(id){
   let p;
@@ -544,7 +549,16 @@ function orderForm(p){
   <div class="fg"><label>Ex-Factory / Deadline</label><input type="date" id="of-exf" value="${/^\d{4}-\d{2}-\d{2}$/.test(p.exf)?p.exf:''}"></div>
   <div class="fg"><label>Priority</label><select id="of-prio">${PRIORITIES.map(s=>`<option ${(p.priority||'Normal')===s?'selected':''}>${s}</option>`).join('')}</select></div>
   <div class="fg"><label>Quality Check</label><select id="of-qc">${['Pending','Pass','Fail','Rework'].map(s=>`<option ${(p.qc&&p.qc.status||'Pending')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div class="fg"><label>Supplier / Factory</label><select id="of-supplier"><option value="">— Unassigned —</option>${getSuppliers().map(su=>`<option value="${su.id}" ${p.supplier===su.id?'selected':''}>${esc(su.name)}</option>`).join('')}</select></div>
 </div>
+
+<hr class="div">
+<label>This Week's Progress — ${weekRangeLabel(mondayOf(new Date()))}</label>
+<div class="fg-grid">
+  <div class="fg"><label>Progress % this week</label><input type="number" id="of-wprog" min="0" max="100" placeholder="—" value="${(()=>{const w=p.weekly&&p.weekly[isoWeekKey(new Date())];return w&&w.progress!=null?w.progress:''})()}"></div>
+  <div class="fg full"><label>Week note</label><input id="of-wnote" placeholder="What was completed this week" value="${esc((()=>{const w=p.weekly&&p.weekly[isoWeekKey(new Date())];return w&&w.note||''})())}"></div>
+</div>
+${p.weekly&&Object.keys(p.weekly).length?`<div style="font-size:11.5px;color:var(--muted)">📈 History: ${Object.keys(p.weekly).sort().map(k=>esc(k)+' → '+((p.weekly[k].progress)||0)+'%').join('  ·  ')}</div>`:''}
 
 <hr class="div">
 <label>Production Checklist</label>
@@ -580,10 +594,16 @@ function compressImg(file,cb){const r=new FileReader();r.onload=ev=>{const img=n
 function addPhotos(inp){[...inp.files].forEach(f=>compressImg(f,d=>{draftPhotos.push(d);$('of-photos').innerHTML=photosHTML()}));inp.value=''}
 
 function collectForm(){
+  const _ex=findProd($('of-id').value)||{};
+  const _weekly=Object.assign({},_ex.weekly||{});
+  const _wk=isoWeekKey(new Date());
+  const _wp=$('of-wprog')?$('of-wprog').value:'';const _wn=$('of-wnote')?$('of-wnote').value.trim():'';
+  if(_wp!==''||_wn){_weekly[_wk]={progress:Math.max(0,Math.min(100,+_wp||0)),note:_wn}}
   return{id:$('of-id').value,year:curYear(),month:$('of-month').value,orderNo:$('of-orderNo').value.trim(),
     party:$('of-party').value.trim(),dest:$('of-dest').value.trim(),product:$('of-product').value.trim(),
     qty:$('of-qty').value,vol:$('of-vol').value,value:$('of-value').value,exf:$('of-exf').value,
     startDate:$('of-start').value,stage:$('of-stage').value,priority:$('of-prio').value,
+    supplier:$('of-supplier')?$('of-supplier').value:(_ex.supplier||''),weekly:_weekly,
     qc:{status:$('of-qc').value,notes:(findProd($('of-id').value)||{}).qc?.notes||''},
     checklist:draftChecklist,materials:draftMaterials,photos:draftPhotos,notes:$('of-notes').value,
     cancelled:$('of-cancel').checked};
@@ -717,6 +737,111 @@ function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReade
 function resetYear(){confirm2('Clear '+curYear()+' orders?','Removes all production orders for '+curYear()+'. Backup first if unsure.',()=>{PD.years[curYear()]={prods:[]};saveAll();render();toast('Cleared')})}
 
 // ════════════════════════════════════════════════════════════════════════════
+//  SUPPLIERS — database, order allocation, weekly progress
+// ════════════════════════════════════════════════════════════════════════════
+function getSuppliers(){if(!PD.suppliers)PD.suppliers=[];return PD.suppliers}
+function findSupplier(id){return getSuppliers().find(s=>s.id===id)}
+function supplierName(id){const s=findSupplier(id);return s?s.name:'(unknown)'}
+function supplierOrders(sid,y){return getProds(y||curYear()).filter(p=>p.supplier===sid&&!p.cancelled)}
+
+// ISO-week helpers for weekly progress tracking
+function mondayOf(d){const x=new Date(d);const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);x.setHours(0,0,0,0);return x}
+function isoWeekKey(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));const wk=Math.ceil(((t-ys)/86400000+1)/7);return t.getUTCFullYear()+'-W'+String(wk).padStart(2,'0')}
+function weekRangeLabel(mon){const sun=new Date(mon);sun.setDate(sun.getDate()+6);const o={day:'numeric',month:'short'};return mon.toLocaleDateString(undefined,o)+' – '+sun.toLocaleDateString(undefined,{...o,year:'numeric'})}
+let selWeek=mondayOf(new Date());
+function curWeekKey(){return isoWeekKey(selWeek)}
+function weekShift(n){selWeek=new Date(selWeek);selWeek.setDate(selWeek.getDate()+n*7);render()}
+function weekToday(){selWeek=mondayOf(new Date());render()}
+
+function renderSuppliers(){
+  const y=curYear();const sups=getSuppliers();const wk=curWeekKey();
+  const allActive=getProds(y).filter(p=>!p.cancelled);
+  const unalloc=allActive.filter(p=>!p.supplier&&!isShippedStage(p.stage));
+  return `
+<div class="sh"><div><div class="sh-t">Suppliers — ${y}</div><div class="sh-s">${sups.length} supplier${sups.length!==1?'s':''} · production allocation & weekly progress</div></div>
+  <button class="btn btn-pri btn-sm" onclick="openSupplier(null)">+ Add Supplier</button></div>
+
+<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;padding:12px 16px">
+  <strong style="font-size:13px">📅 Week:</strong>
+  <button class="btn btn-ghost btn-sm" onclick="weekShift(-1)">←</button>
+  <span style="font-weight:700;font-size:13.5px">${weekRangeLabel(selWeek)}</span><span class="tag">${wk}</span>
+  <button class="btn btn-ghost btn-sm" onclick="weekShift(1)">→</button>
+  <button class="btn btn-ghost btn-sm" onclick="weekToday()">This week</button>
+  <span style="font-size:12px;color:var(--muted);margin-left:auto">Enter each order's % done for the selected week below</span>
+</div>
+
+${sups.length?sups.map(s=>supplierCard(s,wk)).join(''):'<div class="empty"><div class="empty-ico">👷</div>No suppliers yet. Click <strong>+ Add Supplier</strong> to build your supplier database, then allocate orders to them.</div>'}
+
+${unalloc.length?`<div class="card" style="margin-top:16px;border-left:4px solid var(--warn)"><div class="card-title">⚠ Unallocated Orders (${unalloc.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Stage</th><th>Deadline</th><th>Assign to supplier</th></tr></thead><tbody>
+  ${unalloc.map(p=>`<tr><td><strong>${esc(p.orderNo||'—')}</strong></td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td><span class="badge b-stage">${esc(p.stage)}</span></td><td>${fmtDate(p.exf)}</td>
+    <td><select onchange="assignSupplier('${p.id}',this.value)"><option value="">— select —</option>${sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></td></tr>`).join('')}
+  </tbody></table></div>${sups.length?'':'<div style="font-size:12px;color:var(--muted);margin-top:8px">Add a supplier first to allocate these orders.</div>'}</div>`:''}`;
+}
+
+function supplierCard(s,wk){
+  const orders=supplierOrders(s.id);
+  const active=orders.filter(p=>!isShippedStage(p.stage));
+  const units=active.reduce((a,p)=>a+(+p.qty||0),0);
+  const overdue=active.filter(p=>{const d=daysUntil(p.exf);return d!==null&&d<0}).length;
+  const wkVals=active.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+  const wkAvg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
+  return `<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+    <div><div style="font-size:16px;font-weight:800;color:var(--htxt)">👷 ${esc(s.name)} ${s.status==='Inactive'?'<span class="badge b-mut">Inactive</span>':''}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">${s.specialty?'<span class="tag">'+esc(s.specialty)+'</span> ':''}${s.location?'📍 '+esc(s.location)+' ':''}${s.contact?'· 👤 '+esc(s.contact):''}${s.phone?' · 📞 '+esc(s.phone):''}${s.email?' · ✉️ '+esc(s.email):''}</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="openSupplier('${s.id}')">✏️ Edit</button>
+  </div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;margin:14px 0;align-items:center">
+    <div><div style="font-size:22px;font-weight:800">${active.length}</div><div style="color:var(--muted);font-size:11.5px">active orders</div></div>
+    <div><div style="font-size:22px;font-weight:800">${units.toLocaleString()}</div><div style="color:var(--muted);font-size:11.5px">units</div></div>
+    <div><div style="font-size:22px;font-weight:800;color:${overdue?'var(--err)':'inherit'}">${overdue}</div><div style="color:var(--muted);font-size:11.5px">overdue</div></div>
+    <div style="flex:1;min-width:150px"><div style="color:var(--muted);font-size:11.5px;margin-bottom:4px">Avg progress this week — <strong>${wkAvg}%</strong></div><div class="pbar"><span style="width:${wkAvg}%"></span></div></div>
+  </div>
+  ${active.length?`<div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Stage</th><th>Overall</th><th>This week %</th><th>Deadline</th></tr></thead><tbody>
+    ${active.map(p=>{const d=daysUntil(p.exf);const wp=(p.weekly&&p.weekly[wk]&&p.weekly[wk].progress!=null)?p.weekly[wk].progress:'';
+      return `<tr><td style="cursor:pointer" onclick="openOrder('${p.id}')"><strong>${esc(p.orderNo||'—')}</strong></td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td>
+      <td><span class="badge b-stage">${esc(p.stage)}</span></td>
+      <td style="min-width:96px"><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
+      <td><input type="number" min="0" max="100" value="${wp}" placeholder="—" style="width:72px;padding:5px" onchange="setWeekProgress('${p.id}','${wk}',this.value)"></td>
+      <td>${fmtDate(p.exf)} ${d!==null&&d<0?'<span class="badge b-err">'+Math.abs(d)+'d</span>':''}</td></tr>`}).join('')}
+  </tbody></table></div>`:'<div style="font-size:12.5px;color:var(--muted)">No active orders allocated. Use the Unallocated table below or set the supplier on an order.</div>'}
+  </div>`;
+}
+
+function assignSupplier(orderId,supId){const p=findProd(orderId);if(!p)return;p.supplier=supId;p.updatedAt=Date.now();saveAll();render();toast(supId?'Allocated to '+supplierName(supId):'Unassigned')}
+function setWeekProgress(orderId,wk,val){const p=findProd(orderId);if(!p)return;if(!p.weekly)p.weekly={};
+  if(val===''||val==null){delete p.weekly[wk]}else{const n=Math.max(0,Math.min(100,+val||0));p.weekly[wk]=Object.assign({},p.weekly[wk],{progress:n})}
+  p.updatedAt=Date.now();saveAll();toast('Week progress saved')}
+
+let editingSup=null;
+function blankSupplier(){return{id:uid(),name:'',contact:'',phone:'',email:'',location:'',specialty:'',capacity:'',status:'Active',notes:''}}
+function openSupplier(id){const s=id?findSupplier(id):blankSupplier();if(id&&!s){toast('Supplier not found');return}editingSup=id||null;
+  $('sup-title').textContent=id?('Edit '+(s.name||'Supplier')):'New Supplier';$('sup-body').innerHTML=supplierForm(s);openModal('sup-ov')}
+function supplierForm(s){return `
+<input type="hidden" id="sf-id" value="${esc(s.id)}">
+<div class="fg-grid">
+  <div class="fg full"><label>Supplier / Factory Name *</label><input id="sf-name" value="${esc(s.name)}" placeholder="e.g. Rahman Handicrafts"></div>
+  <div class="fg"><label>Contact Person</label><input id="sf-contact" value="${esc(s.contact)}" placeholder="e.g. Abdul Rahman"></div>
+  <div class="fg"><label>Phone</label><input id="sf-phone" value="${esc(s.phone)}" placeholder="+880…"></div>
+  <div class="fg"><label>Email</label><input id="sf-email" value="${esc(s.email)}"></div>
+  <div class="fg"><label>Location</label><input id="sf-location" value="${esc(s.location)}" placeholder="e.g. Sherpur, Tangail"></div>
+  <div class="fg"><label>Specialty / Products</label><input id="sf-specialty" value="${esc(s.specialty)}" placeholder="e.g. Seagrass, Water hyacinth"></div>
+  <div class="fg"><label>Monthly Capacity (units)</label><input type="number" id="sf-capacity" value="${esc(s.capacity)}" placeholder="0"></div>
+  <div class="fg"><label>Status</label><select id="sf-status">${['Active','Inactive'].map(x=>`<option ${s.status===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  <div class="fg full"><label>Notes</label><textarea id="sf-notes" rows="2" placeholder="Terms, lead time, quality notes…">${esc(s.notes)}</textarea></div>
+</div>
+${editingSup?'<div style="margin-top:10px"><button class="btn btn-err btn-sm" onclick="deleteSupplier()">🗑 Delete supplier</button></div>':''}`}
+function saveSupplier(){const name=$('sf-name').value.trim();if(!name){toast('Supplier name is required');return}
+  const obj={id:$('sf-id').value,name:name,contact:$('sf-contact').value.trim(),phone:$('sf-phone').value.trim(),email:$('sf-email').value.trim(),location:$('sf-location').value.trim(),specialty:$('sf-specialty').value.trim(),capacity:$('sf-capacity').value,status:$('sf-status').value,notes:$('sf-notes').value};
+  const list=getSuppliers();const ex=list.find(x=>x.id===obj.id);if(ex)Object.assign(ex,obj);else list.push(obj);
+  saveAll();closeModal('sup-ov');render();toast('✅ Supplier saved')}
+function deleteSupplier(){const id=$('sf-id').value;let n=0;Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if(p.supplier===id)n++}));
+  confirm2('Delete supplier?',(n?n+' allocated order(s) across all years will be unassigned. ':'')+'This cannot be undone.',()=>{
+    Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if(p.supplier===id)p.supplier=''}));
+    PD.suppliers=getSuppliers().filter(x=>x.id!==id);saveAll();closeModal('sup-ov');render();toast('Supplier deleted')})}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  CLOUD SYNC — GitHub Gist (shared with Export Manager)
 // ════════════════════════════════════════════════════════════════════════════
 async function gistGet(){const c=PD.cloud||{};if(!c.gistId)throw new Error('No Gist ID set in Settings');
@@ -731,7 +856,7 @@ function prodFromShipment(y,s){const stage=s.cancelled?stages()[0]:(s.shipped===
   return{id:uid(),year:y,month:s.month||'',orderNo:s.orderNo||'',party:s.party||'',dest:s.dest||'',product:'',
     qty:'',vol:s.vol||'',value:s.iamt||s.oamt||'',exf:(/^\d{4}-\d{2}-\d{2}$/.test(s.exf)?s.exf:''),startDate:todayISO(),
     stage:stage,progress:stageProgress(stage),priority:'Normal',checklist:[],materials:[],qc:{status:'Pending',notes:''},
-    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled}}
+    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled,supplier:'',weekly:{}}}
 
 function mergeOrders(y,shipments){const arr=getProds(y);const byNo={};arr.forEach(p=>{if(p.orderNo)byNo[p.orderNo]=p});
   let added=0,updated=0;
@@ -755,7 +880,7 @@ async function doPullOrders(){
 async function doPushProduction(silent){
   const c=PD.cloud||{};if(!c.token){if(!silent)toast('Add a GitHub token in Settings');return}
   if(!silent)setSync('warn','Pushing…');
-  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages});
+  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages,suppliers:PD.suppliers});
     if(!c.gistId){const res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':'Bearer '+c.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'},body:JSON.stringify({description:'Production Manager Data',public:false,files:{[GIST_PROD_FILE]:{content:data}}})});
       if(!res.ok)throw new Error('Create failed: '+res.status);const g=await res.json();PD.cloud.gistId=g.id;saveAll();
       if(!silent)toast('☁ New Gist created: '+g.id+' — paste this same ID into Export Manager to link them');}
@@ -766,7 +891,7 @@ async function doPushProduction(silent){
 async function doPullProduction(){
   setSync('warn','Pulling…');
   try{const g=await gistGet();const f=g.files&&g.files[GIST_PROD_FILE];if(!f)throw new Error('No '+GIST_PROD_FILE+' yet — push first');
-    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;
+    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;if(d.suppliers)PD.suppliers=d.suppliers;
     saveAll();render();setSync('ok','Pulled '+new Date().toLocaleTimeString());toast('☁ Production data pulled');
   }catch(e){setSync('err','Pull error');toast('Pull error: '+e.message)}
 }
