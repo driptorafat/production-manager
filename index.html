@@ -129,12 +129,12 @@ tbody tr:hover{background:var(--card2)}
 
 /* Badges */
 .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
-.b-stage{background:var(--pril);color:var(--prid)}
+.b-stage{background:var(--pril);color:var(--pri)}
 .b-ok{background:var(--okl);color:var(--ok)}.b-warn{background:var(--warnl);color:var(--warn)}
 .b-err{background:var(--errl);color:var(--err)}.b-acc{background:var(--accl);color:var(--acc)}
 .b-mut{background:var(--divider);color:var(--muted)}
 .pri-Urgent{background:var(--errl);color:var(--err)}.pri-High{background:var(--accl);color:var(--acc)}
-.pri-Normal{background:var(--pril);color:var(--prid)}.pri-Low{background:var(--divider);color:var(--muted)}
+.pri-Normal{background:var(--pril);color:var(--pri)}.pri-Low{background:var(--divider);color:var(--muted)}
 
 /* Kanban */
 .board{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;align-items:flex-start}
@@ -185,7 +185,7 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--txt);color:var(--bg);
   padding:11px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:.25s}
 .toast.show{opacity:1}
-.note{background:var(--pril);color:var(--prid);font-size:12.5px;padding:10px 13px;border-radius:9px;margin-bottom:14px}
+.note{background:var(--pril);color:var(--htxt);font-size:12.5px;padding:10px 13px;border-radius:9px;margin-bottom:14px}
 .bars{display:flex;flex-direction:column;gap:9px}
 .bar-row{display:grid;grid-template-columns:120px 1fr 48px;align-items:center;gap:10px;font-size:12.5px}
 .bar-track{height:14px;background:var(--divider);border-radius:7px;overflow:hidden}
@@ -361,7 +361,7 @@ function render(){
   const c=$('content');
   if(route==='dashboard')c.innerHTML=renderDashboard();
   else if(route==='board')c.innerHTML=renderBoard();
-  else if(route==='orders')c.innerHTML=renderOrders();
+  else if(route==='orders'){c.innerHTML=renderOrders();paintOrders()}
   else if(route==='suppliers'){c.innerHTML=renderSuppliers()}
   else if(route==='calendar')c.innerHTML=renderCalendar();
   else if(route==='reports')c.innerHTML=renderReports();
@@ -468,7 +468,7 @@ function dropCard(e,stageName){e.preventDefault();document.querySelectorAll('.co
 // ════════════════════════════════════════════════════════════════════════════
 //  ORDERS TABLE
 // ════════════════════════════════════════════════════════════════════════════
-let ordFilter={q:'',stage:'',prio:''};
+let ordFilter={q:'',stage:'',prio:'',sup:''};
 function renderOrders(){
   const y=curYear();let list=getProds(y).slice();
   return `
@@ -478,6 +478,7 @@ function renderOrders(){
   <input class="search-inp" id="ord-q" placeholder="🔍 Search order #, buyer, product, destination…" value="${esc(ordFilter.q)}" oninput="ordFilter.q=this.value;paintOrders()">
   <select id="ord-stage" onchange="ordFilter.stage=this.value;paintOrders()"><option value="">All stages</option>${stages().map(s=>`<option ${ordFilter.stage===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
   <select id="ord-prio" onchange="ordFilter.prio=this.value;paintOrders()"><option value="">All priorities</option>${PRIORITIES.map(s=>`<option ${ordFilter.prio===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+  <select id="ord-sup" onchange="ordFilter.sup=this.value;paintOrders()"><option value="">All suppliers</option><option value="__none__" ${ordFilter.sup==='__none__'?'selected':''}>— Unallocated —</option>${getSuppliers().map(s=>`<option value="${s.id}" ${ordFilter.sup===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
 </div>
 <div id="ord-table"></div>`;
 }
@@ -486,7 +487,8 @@ function filteredOrders(){
   return getProds(curYear()).filter(p=>{
     if(ordFilter.stage&&p.stage!==ordFilter.stage)return false;
     if(ordFilter.prio&&(p.priority||'Normal')!==ordFilter.prio)return false;
-    if(q){const hay=[p.orderNo,p.party,p.product,p.dest,p.notes].join(' ').toLowerCase();if(!hay.includes(q))return false}
+    if(ordFilter.sup){if(ordFilter.sup==='__none__'){if(p.supplier)return false}else if(p.supplier!==ordFilter.sup)return false}
+    if(q){const hay=[p.orderNo,p.party,p.product,p.dest,p.notes,p.supplier?supplierName(p.supplier):''].join(' ').toLowerCase();if(!hay.includes(q))return false}
     return true}).sort((a,b)=>{const da=daysUntil(a.exf),db=daysUntil(b.exf);if(da===null)return 1;if(db===null)return -1;return da-db});
 }
 function paintOrders(){
@@ -648,6 +650,7 @@ function renderReports(){
     <div class="card"><div class="card-title">🏭 Production Status</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">All active orders with stage, progress, deadline and priority.</p><button class="btn btn-pri btn-sm" onclick="printStatus()">🖨 Print</button></div>
     <div class="card"><div class="card-title">⏰ Deadline / WIP</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Work-in-progress sorted by ex-factory date with overdue flags.</p><button class="btn btn-pri btn-sm" onclick="printDeadlines()">🖨 Print</button></div>
     <div class="card"><div class="card-title">📦 Materials Summary</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Outstanding raw materials across all active orders.</p><button class="btn btn-pri btn-sm" onclick="printMaterials()">🖨 Print</button></div>
+    <div class="card"><div class="card-title">👷 Supplier Weekly Progress</div><p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">All suppliers' orders and weekly % for the week selected on the Suppliers tab (${weekRangeLabel(selWeek)}).</p><button class="btn btn-pri btn-sm" onclick="printAllSuppliersWeek()">🖨 Print</button></div>
   </div>`;
 }
 function printWindow(title,body){const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
@@ -790,7 +793,7 @@ function supplierCard(s,wk){
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
     <div><div style="font-size:16px;font-weight:800;color:var(--htxt)">👷 ${esc(s.name)} ${s.status==='Inactive'?'<span class="badge b-mut">Inactive</span>':''}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:3px">${s.specialty?'<span class="tag">'+esc(s.specialty)+'</span> ':''}${s.location?'📍 '+esc(s.location)+' ':''}${s.contact?'· 👤 '+esc(s.contact):''}${s.phone?' · 📞 '+esc(s.phone):''}${s.email?' · ✉️ '+esc(s.email):''}</div></div>
-    <button class="btn btn-ghost btn-sm" onclick="openSupplier('${s.id}')">✏️ Edit</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="printSupplierWeek('${s.id}')">🖨 Weekly Report</button><button class="btn btn-ghost btn-sm" onclick="openSupplier('${s.id}')">✏️ Edit</button></div>
   </div>
   <div style="display:flex;gap:20px;flex-wrap:wrap;margin:14px 0;align-items:center">
     <div><div style="font-size:22px;font-weight:800">${active.length}</div><div style="color:var(--muted);font-size:11.5px">active orders</div></div>
@@ -813,6 +816,28 @@ function assignSupplier(orderId,supId){const p=findProd(orderId);if(!p)return;p.
 function setWeekProgress(orderId,wk,val){const p=findProd(orderId);if(!p)return;if(!p.weekly)p.weekly={};
   if(val===''||val==null){delete p.weekly[wk]}else{const n=Math.max(0,Math.min(100,+val||0));p.weekly[wk]=Object.assign({},p.weekly[wk],{progress:n})}
   p.updatedAt=Date.now();saveAll();toast('Week progress saved')}
+
+// ── Printable weekly reports (for sharing targets/progress with each factory) ──
+const _supWeekHead='<thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Target Qty</th><th>Stage</th><th>Overall</th><th>This Week</th><th>Ex-Factory</th><th>Week Note</th></tr></thead>';
+function _supWeekRow(p,wk){const w=p.weekly&&p.weekly[wk];const wp=w&&w.progress!=null?w.progress+'%':'—';const wn=w&&w.note?esc(w.note):'';const d=daysUntil(p.exf);const late=d!==null&&d<0;
+  return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${p.qty?(+p.qty).toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td><strong>${wp}</strong></td><td class="${late?'over':''}">${fmtDate(p.exf)}${late?' ('+Math.abs(d)+'d late)':''}</td><td>${wn}</td></tr>`}
+function printSupplierWeek(sid){const s=findSupplier(sid);if(!s)return;const wk=curWeekKey();
+  const orders=supplierOrders(sid).filter(p=>!isShippedStage(p.stage));
+  const units=orders.reduce((a,p)=>a+(+p.qty||0),0);
+  const wkVals=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+  const avg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
+  const body=`<div style="margin:0 0 14px;font-size:13px;line-height:1.7">
+    <strong>Supplier:</strong> ${esc(s.name)}${s.contact?' · '+esc(s.contact):''}${s.phone?' · '+esc(s.phone):''}${s.location?' · '+esc(s.location):''}<br>
+    <strong>Week:</strong> ${weekRangeLabel(selWeek)} (${wk}) &nbsp;·&nbsp; <strong>${orders.length}</strong> active orders &nbsp;·&nbsp; <strong>${units.toLocaleString()}</strong> units &nbsp;·&nbsp; avg progress this week <strong>${avg}%</strong></div>
+    <table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,wk)).join('')||'<tr><td colspan="9">No active orders allocated.</td></tr>'}</tbody></table>`;
+  printWindow('Weekly Production Report — '+s.name,body);
+}
+function printAllSuppliersWeek(){const wk=curWeekKey();const sups=getSuppliers();let body=`<div style="margin:0 0 6px;font-size:13px"><strong>Week:</strong> ${weekRangeLabel(selWeek)} (${wk})</div>`;let any=false;
+  sups.forEach(s=>{const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));if(!orders.length)return;any=true;
+    body+=`<h2 style="font-size:15px;margin:18px 0 6px">👷 ${esc(s.name)}${s.location?' <span style="font-weight:400;color:#666;font-size:12px">— '+esc(s.location)+'</span>':''}</h2><table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,wk)).join('')}</tbody></table>`});
+  if(!any)body+='<p>No suppliers have active allocated orders.</p>';
+  printWindow('Supplier Weekly Progress',body);
+}
 
 let editingSup=null;
 function blankSupplier(){return{id:uid(),name:'',contact:'',phone:'',email:'',location:'',specialty:'',capacity:'',status:'Active',notes:''}}
