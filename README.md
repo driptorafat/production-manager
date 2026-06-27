@@ -17,7 +17,10 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
 - **Orders** — searchable/filterable table with progress bars, deadlines, priority.
 - **Order editor** — stage pipeline, production checklist, raw-material/BOM tracking
   (needed vs received), quality-check status, photos, notes, priority, supplier allocation.
-- **Suppliers** — supplier/factory database (contact, location, specialty, capacity).
+- **Suppliers** — supplier/factory database (contact, address, specialty, capacity,
+  editable 1–5 star **rating**). A **Supplier List** table at the top shows each
+  company, contact, address, capacity, rating, active orders, and **order share**
+  (% of all allocated production units). Click a row to jump to that supplier.
   **One order can be split across multiple suppliers** with a per-supplier quantity,
   and each supplier reports their own weekly progress on their share.
   See which supplier is making which orders, allocate orders to suppliers, and record

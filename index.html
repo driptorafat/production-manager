@@ -798,6 +798,8 @@ function renderSuppliers(){
 <div class="sh"><div><div class="sh-t">Suppliers — ${y}</div><div class="sh-s">${sups.length} supplier${sups.length!==1?'s':''} · production allocation & weekly progress</div></div>
   <button class="btn btn-pri btn-sm" onclick="openSupplier(null)">+ Add Supplier</button></div>
 
+${supplierListTable(y)}
+
 <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;padding:12px 16px">
   <strong style="font-size:13px">📅 Week:</strong>
   <button class="btn btn-ghost btn-sm" onclick="weekShift(-1)">←</button>
@@ -842,6 +844,25 @@ function supplierBreakdownCard(y){
       :(sups.length?'<div style="color:var(--muted);font-size:13px;padding:8px 0">No active orders allocated yet.</div>':'<div style="color:var(--muted);font-size:13px;padding:8px 0">No suppliers yet — add them in the <strong>Suppliers</strong> tab.</div>')}
   </div>`;
 }
+function supplierListTable(y){const sups=getSuppliers();if(!sups.length)return '';
+  const data=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{s,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0)}});
+  const totalUnits=data.reduce((a,d)=>a+d.units,0);
+  data.sort((a,b)=>b.units-a.units||a.s.name.localeCompare(b.s.name));
+  return `<div class="card" style="margin-bottom:16px"><div class="card-title">📋 Supplier List (${sups.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Company</th><th>Contact</th><th>Address</th><th>Capacity /mo</th><th>Rating</th><th>Active Orders</th><th>Order Share</th></tr></thead><tbody>
+  ${data.map(d=>{const sh=totalUnits?Math.round(d.units/totalUnits*100):0;return `<tr style="cursor:pointer" onclick="(document.getElementById('sup-card-${d.s.id}')||{}).scrollIntoView&&document.getElementById('sup-card-${d.s.id}').scrollIntoView({behavior:'smooth',block:'start'})">
+    <td><strong>${esc(d.s.name)}</strong>${d.s.status==='Inactive'?' <span class="badge b-mut">Inactive</span>':''}${d.s.specialty?'<div style="font-size:11px;color:var(--muted)">'+esc(d.s.specialty)+'</div>':''}</td>
+    <td>${esc(d.s.contact||'—')}${d.s.phone?'<div style="font-size:11px;color:var(--muted)">'+esc(d.s.phone)+'</div>':''}</td>
+    <td style="max-width:200px;font-size:12px">${esc(d.s.location||'—')}</td>
+    <td>${d.s.capacity?(+d.s.capacity).toLocaleString():'—'}</td>
+    <td title="${(+d.s.rating||0)}/5" style="white-space:nowrap;color:var(--warn);font-size:14px">${starsDisplay(+d.s.rating||0)}</td>
+    <td>${d.orders}</td>
+    <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${sh}%"></div></div><span style="font-size:11.5px;color:var(--muted);width:34px;text-align:right">${sh}%</span></div></td>
+  </tr>`}).join('')}
+  </tbody></table></div>
+  <div style="font-size:11px;color:var(--muted);margin-top:8px">${totalUnits?'Order share = allocated units ÷ all allocated active units ('+totalUnits.toLocaleString()+' pcs). Click a row to jump to the supplier.':'Allocate orders to suppliers to see order share.'}</div>
+  </div>`;
+}
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);
   const active=orders.filter(p=>!isShippedStage(p.stage));
@@ -851,7 +872,7 @@ function supplierCard(s,wk){
   const wkAvg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
   const cap=+s.capacity||0;const util=cap?Math.round(units/cap*100):null;
   const utilColor=util==null?'inherit':util>100?'var(--err)':util>=85?'var(--warn)':'var(--ok)';
-  return `<div class="card" style="margin-bottom:14px">
+  return `<div class="card" id="sup-card-${s.id}" style="margin-bottom:14px">
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
     <div><div style="font-size:16px;font-weight:800;color:var(--htxt)">👷 ${esc(s.name)} ${s.status==='Inactive'?'<span class="badge b-mut">Inactive</span>':''}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:3px">${s.specialty?'<span class="tag">'+esc(s.specialty)+'</span> ':''}${s.location?'📍 '+esc(s.location)+' ':''}${s.contact?'· 👤 '+esc(s.contact):''}${s.phone?' · 📞 '+esc(s.phone):''}${s.email?' · ✉️ '+esc(s.email):''}</div></div>
@@ -926,7 +947,10 @@ function printAllSuppliersWeek(){const wk=curWeekKey();const sups=getSuppliers()
 }
 
 let editingSup=null;
-function blankSupplier(){return{id:uid(),name:'',contact:'',phone:'',email:'',location:'',specialty:'',capacity:'',status:'Active',notes:''}}
+function blankSupplier(){return{id:uid(),name:'',contact:'',phone:'',email:'',location:'',specialty:'',capacity:'',rating:0,status:'Active',notes:''}}
+function starsDisplay(n){n=+n||0;let h='';for(let i=1;i<=5;i++)h+=(i<=n?'★':'<span style="color:var(--bdr)">☆</span>');return h}
+function starPicker(n){n=+n||0;let h='';for(let i=1;i<=5;i++)h+=`<span onclick="setStar(${i})" style="color:${i<=n?'var(--warn)':'var(--bdr)'};cursor:pointer">★</span>`;return h+` <span onclick="setStar(0)" style="font-size:11px;color:var(--muted);cursor:pointer;margin-left:8px">clear</span>`}
+function setStar(n){$('sf-rating').value=n;$('sf-stars').innerHTML=starPicker(n)}
 function openSupplier(id){const s=id?findSupplier(id):blankSupplier();if(id&&!s){toast('Supplier not found');return}editingSup=id||null;
   $('sup-title').textContent=id?('Edit '+(s.name||'Supplier')):'New Supplier';$('sup-body').innerHTML=supplierForm(s);openModal('sup-ov')}
 function supplierForm(s){return `
@@ -936,15 +960,16 @@ function supplierForm(s){return `
   <div class="fg"><label>Contact Person</label><input id="sf-contact" value="${esc(s.contact)}" placeholder="e.g. Abdul Rahman"></div>
   <div class="fg"><label>Phone</label><input id="sf-phone" value="${esc(s.phone)}" placeholder="+880…"></div>
   <div class="fg"><label>Email</label><input id="sf-email" value="${esc(s.email)}"></div>
-  <div class="fg"><label>Location</label><input id="sf-location" value="${esc(s.location)}" placeholder="e.g. Sherpur, Tangail"></div>
+  <div class="fg full"><label>Address</label><input id="sf-location" value="${esc(s.location)}" placeholder="e.g. Village, Sherpur, Tangail"></div>
   <div class="fg"><label>Specialty / Products</label><input id="sf-specialty" value="${esc(s.specialty)}" placeholder="e.g. Seagrass, Water hyacinth"></div>
   <div class="fg"><label>Monthly Capacity (units)</label><input type="number" id="sf-capacity" value="${esc(s.capacity)}" placeholder="0"></div>
+  <div class="fg"><label>Supplier Rating</label><div id="sf-stars" style="font-size:24px;line-height:1.2">${starPicker(+s.rating||0)}</div><input type="hidden" id="sf-rating" value="${+s.rating||0}"></div>
   <div class="fg"><label>Status</label><select id="sf-status">${['Active','Inactive'].map(x=>`<option ${s.status===x?'selected':''}>${x}</option>`).join('')}</select></div>
   <div class="fg full"><label>Notes</label><textarea id="sf-notes" rows="2" placeholder="Terms, lead time, quality notes…">${esc(s.notes)}</textarea></div>
 </div>
 ${editingSup?'<div style="margin-top:10px"><button class="btn btn-err btn-sm" onclick="deleteSupplier()">🗑 Delete supplier</button></div>':''}`}
 function saveSupplier(){const name=$('sf-name').value.trim();if(!name){toast('Supplier name is required');return}
-  const obj={id:$('sf-id').value,name:name,contact:$('sf-contact').value.trim(),phone:$('sf-phone').value.trim(),email:$('sf-email').value.trim(),location:$('sf-location').value.trim(),specialty:$('sf-specialty').value.trim(),capacity:$('sf-capacity').value,status:$('sf-status').value,notes:$('sf-notes').value};
+  const obj={id:$('sf-id').value,name:name,contact:$('sf-contact').value.trim(),phone:$('sf-phone').value.trim(),email:$('sf-email').value.trim(),location:$('sf-location').value.trim(),specialty:$('sf-specialty').value.trim(),capacity:$('sf-capacity').value,rating:+$('sf-rating').value||0,status:$('sf-status').value,notes:$('sf-notes').value};
   const list=getSuppliers();const ex=list.find(x=>x.id===obj.id);if(ex)Object.assign(ex,obj);else list.push(obj);
   saveAll();closeModal('sup-ov');render();toast('✅ Supplier saved')}
 function deleteSupplier(){const id=$('sf-id').value;let n=0;Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if((p.allocations||[]).some(a=>a.supplierId===id))n++}));
