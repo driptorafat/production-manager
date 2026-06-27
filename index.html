@@ -309,6 +309,7 @@ async function loadData(){
   if(!PD.cloud)PD.cloud={token:'',gistId:'',autoSync:false};
   if(!PD.stages||!PD.stages.length)PD.stages=[...DEFAULT_STAGES];
   if(!PD.suppliers)PD.suppliers=[];
+  migrateAllocations();
 }
 let _saveT=null;
 function saveAll(){
@@ -462,7 +463,7 @@ function kcard(p){const d=daysUntil(p.exf);const cls=d===null?'due-ok':d<0?'due-
       <span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></div>
     ${p.product?`<div style="font-size:11.5px;color:var(--muted);margin-top:5px">📦 ${esc(p.product)}${p.qty?' · '+(+p.qty).toLocaleString()+' pcs':''}</div>`:''}
     <div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div>
-    <div class="kcard-meta"><span class="kcard-due ${cls}">📅 ${esc(lbl)}</span>${p.dest?`<span class="tag">${esc(p.dest)}</span>`:''}${p.supplier?`<span class="tag">👷 ${esc(supplierName(p.supplier))}</span>`:''}</div>
+    <div class="kcard-meta"><span class="kcard-due ${cls}">📅 ${esc(lbl)}</span>${p.dest?`<span class="tag">${esc(p.dest)}</span>`:''}${(p.allocations||[]).map(a=>`<span class="tag">👷 ${esc(supplierName(a.supplierId))}</span>`).join('')}</div>
   </div>`}
 function dragStart(e,id){e.dataTransfer.setData('id',id);e.target.classList.add('drag')}
 function dropCard(e,stageName){e.preventDefault();document.querySelectorAll('.col-body').forEach(c=>c.classList.remove('dragover'));
@@ -493,8 +494,8 @@ function filteredOrders(){
   return getProds(curYear()).filter(p=>{
     if(ordFilter.stage&&p.stage!==ordFilter.stage)return false;
     if(ordFilter.prio&&(p.priority||'Normal')!==ordFilter.prio)return false;
-    if(ordFilter.sup){if(ordFilter.sup==='__none__'){if(p.supplier)return false}else if(p.supplier!==ordFilter.sup)return false}
-    if(q){const hay=[p.orderNo,p.party,p.product,p.dest,p.notes,p.supplier?supplierName(p.supplier):''].join(' ').toLowerCase();if(!hay.includes(q))return false}
+    if(ordFilter.sup){const ids=(p.allocations||[]).map(a=>a.supplierId);if(ordFilter.sup==='__none__'){if(ids.length)return false}else if(!ids.includes(ordFilter.sup))return false}
+    if(q){const hay=[p.orderNo,p.party,p.product,p.dest,p.notes,(p.allocations||[]).map(a=>supplierName(a.supplierId)).join(' ')].join(' ').toLowerCase();if(!hay.includes(q))return false}
     return true}).sort((a,b)=>{const da=daysUntil(a.exf),db=daysUntil(b.exf);if(da===null)return 1;if(db===null)return -1;return da-db});
 }
 function paintOrders(){
@@ -506,7 +507,7 @@ function paintOrders(){
       const dtxt=d===null?fmtDate(p.exf):d<0?Math.abs(d)+'d late':d===0?'today':'in '+d+'d';
       return `<tr style="cursor:pointer" onclick="openOrder('${p.id}')">
       <td><strong>${esc(p.orderNo||'—')}</strong>${p.cancelled?' <span class="badge b-err">Cancelled</span>':''}${p.source==='export-manager'?' <span class="tag" title="Imported from Export Manager">🔗</span>':''}</td>
-      <td>${esc(p.party||'—')}</td><td>${p.supplier?esc(supplierName(p.supplier)):'<span style="color:var(--muted)">—</span>'}</td><td>${esc(p.product||'—')}</td><td>${esc(p.dest||'—')}</td>
+      <td>${esc(p.party||'—')}</td><td>${(p.allocations||[]).length?(p.allocations||[]).map(a=>esc(supplierName(a.supplierId))+(a.qty?' ('+(+a.qty).toLocaleString()+')':'')).join('<br>'):'<span style="color:var(--muted)">—</span>'}</td><td>${esc(p.product||'—')}</td><td>${esc(p.dest||'—')}</td>
       <td>${p.qty?(+p.qty).toLocaleString():'—'}</td>
       <td><span class="badge b-stage">${esc(p.stage)}</span></td>
       <td><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
@@ -521,8 +522,8 @@ function paintOrders(){
 // ════════════════════════════════════════════════════════════════════════════
 function blankProd(){return{id:uid(),year:curYear(),month:MONTHS[new Date().getMonth()],orderNo:'',party:'',dest:'',
   product:'',qty:'',vol:'',exf:'',value:'',stage:stages()[0],priority:'Normal',startDate:todayISO(),
-  checklist:[],materials:[],qc:{status:'Pending',notes:''},photos:[],notes:'',source:'manual',cancelled:false,supplier:'',weekly:{}}}
-let draftChecklist=[],draftMaterials=[];
+  checklist:[],materials:[],qc:{status:'Pending',notes:''},photos:[],notes:'',source:'manual',cancelled:false,allocations:[],weekly:{}}}
+let draftChecklist=[],draftMaterials=[],draftAllocations=[],draftWeekly={};
 function openOrder(id){
   let p;
   if(id){p=findProd(id);if(!p){toast('Order not found');return}editingId=id}
@@ -530,6 +531,8 @@ function openOrder(id){
   draftChecklist=JSON.parse(JSON.stringify(p.checklist||[]));
   draftMaterials=JSON.parse(JSON.stringify(p.materials||[]));
   draftPhotos=(p.photos||[]).slice();
+  draftAllocations=JSON.parse(JSON.stringify(p.allocations||[]));
+  draftWeekly=JSON.parse(JSON.stringify(p.weekly||{}));
   $('ord-title').textContent=id?('Order '+(p.orderNo||'')):'New Production Order';
   $('ord-body').innerHTML=orderForm(p);
   openModal('ord-ov');
@@ -557,16 +560,16 @@ function orderForm(p){
   <div class="fg"><label>Ex-Factory / Deadline</label><input type="date" id="of-exf" value="${/^\d{4}-\d{2}-\d{2}$/.test(p.exf)?p.exf:''}"></div>
   <div class="fg"><label>Priority</label><select id="of-prio">${PRIORITIES.map(s=>`<option ${(p.priority||'Normal')===s?'selected':''}>${s}</option>`).join('')}</select></div>
   <div class="fg"><label>Quality Check</label><select id="of-qc">${['Pending','Pass','Fail','Rework'].map(s=>`<option ${(p.qc&&p.qc.status||'Pending')===s?'selected':''}>${s}</option>`).join('')}</select></div>
-  <div class="fg"><label>Supplier / Factory</label><select id="of-supplier"><option value="">— Unassigned —</option>${getSuppliers().map(su=>`<option value="${su.id}" ${p.supplier===su.id?'selected':''}>${esc(su.name)}</option>`).join('')}</select></div>
 </div>
 
 <hr class="div">
-<label>This Week's Progress — ${weekRangeLabel(mondayOf(new Date()))}</label>
-<div class="fg-grid">
-  <div class="fg"><label>Progress % this week</label><input type="number" id="of-wprog" min="0" max="100" placeholder="—" value="${(()=>{const w=p.weekly&&p.weekly[isoWeekKey(new Date())];return w&&w.progress!=null?w.progress:''})()}"></div>
-  <div class="fg full"><label>Week note</label><input id="of-wnote" placeholder="What was completed this week" value="${esc((()=>{const w=p.weekly&&p.weekly[isoWeekKey(new Date())];return w&&w.note||''})())}"></div>
-</div>
-${p.weekly&&Object.keys(p.weekly).length?`<div style="font-size:11.5px;color:var(--muted)">📈 History: ${Object.keys(p.weekly).sort().map(k=>esc(k)+' → '+((p.weekly[k].progress)||0)+'%').join('  ·  ')}</div>`:''}
+<label>Supplier Allocation — split this order across one or more factories</label>
+<div id="of-alloc">${allocHTML()}</div>
+<button class="btn btn-ghost btn-sm" onclick="addAlloc()" style="margin-top:4px">+ Add supplier</button>
+
+<hr class="div">
+<label>This Week's Progress — ${weekRangeLabel(mondayOf(new Date()))} (per supplier)</label>
+<div id="of-weekly">${weeklyHTML()}</div>
 
 <hr class="div">
 <label>Production Checklist</label>
@@ -597,21 +600,38 @@ function addChecklist(){draftChecklist.push({text:'',done:false});$('of-checklis
 function materialsHTML(){return `<div style="display:grid;grid-template-columns:1fr 80px 80px 70px 34px;gap:6px;font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:4px"><span>MATERIAL</span><span>NEEDED</span><span>RECEIVED</span><span>UNIT</span><span></span></div>`+
   (draftMaterials.length?draftMaterials.map((m,i)=>`<div style="display:grid;grid-template-columns:1fr 80px 80px 70px 34px;gap:6px;margin-bottom:6px"><input value="${esc(m.name)}" oninput="draftMaterials[${i}].name=this.value" placeholder="e.g. Seagrass"><input type="number" value="${esc(m.req)}" oninput="draftMaterials[${i}].req=this.value"><input type="number" value="${esc(m.recv)}" oninput="draftMaterials[${i}].recv=this.value"><input value="${esc(m.unit)}" oninput="draftMaterials[${i}].unit=this.value" placeholder="kg"><button class="del-x" onclick="draftMaterials.splice(${i},1);$('of-materials').innerHTML=materialsHTML()">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">No materials listed.</div>')}
 function addMaterial(){draftMaterials.push({name:'',req:'',recv:'',unit:''});$('of-materials').innerHTML=materialsHTML()}
+function allocHTML(){const sups=getSuppliers();
+  if(!sups.length)return '<div style="font-size:12px;color:var(--muted)">No suppliers yet — add them in the Suppliers tab first.</div>';
+  const rows=draftAllocations.length?draftAllocations.map((a,i)=>`<div style="display:flex;gap:8px;margin-bottom:7px;align-items:center">
+    <select style="flex:1" onchange="draftAllocations[${i}].supplierId=this.value;refreshAllocWeekly()"><option value="">— select supplier —</option>${sups.map(su=>`<option value="${su.id}" ${a.supplierId===su.id?'selected':''}>${esc(su.name)}</option>`).join('')}</select>
+    <input type="number" placeholder="Qty" value="${esc(a.qty)}" style="width:110px" oninput="draftAllocations[${i}].qty=this.value;refreshAllocTotal()">
+    <button class="del-x" onclick="draftAllocations.splice(${i},1);refreshAllocWeekly()">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Not allocated yet — click "+ Add supplier".</div>';
+  const tot=draftAllocations.reduce((s,a)=>s+(+a.qty||0),0);
+  return rows+(draftAllocations.length?`<div id="of-alloc-total" style="font-size:11.5px;color:var(--muted)">Total allocated: ${tot.toLocaleString()} pcs</div>`:'');}
+function refreshAllocWeekly(){$('of-alloc').innerHTML=allocHTML();$('of-weekly').innerHTML=weeklyHTML();}
+function refreshAllocTotal(){const el=$('of-alloc-total');if(el)el.textContent='Total allocated: '+draftAllocations.reduce((s,a)=>s+(+a.qty||0),0).toLocaleString()+' pcs';}
+function addAlloc(){draftAllocations.push({supplierId:'',qty:''});refreshAllocWeekly();}
+function weeklyHTML(){const wk=isoWeekKey(new Date());const allocs=draftAllocations.filter(a=>a.supplierId);
+  if(!allocs.length)return '<div style="font-size:12px;color:var(--muted)">Allocate to a supplier above to record weekly progress.</div>';
+  return allocs.map(a=>{const sid=a.supplierId;const w=(draftWeekly[sid]&&draftWeekly[sid][wk])||{};
+    return `<div style="display:grid;grid-template-columns:150px 88px 1fr;gap:8px;margin-bottom:7px;align-items:center">
+      <span style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👷 ${esc(supplierName(sid))}</span>
+      <input type="number" min="0" max="100" placeholder="%" value="${w.progress!=null?w.progress:''}" oninput="setDraftWeek('${sid}','${wk}','progress',this.value)">
+      <input placeholder="Note (what was done)" value="${esc(w.note||'')}" oninput="setDraftWeek('${sid}','${wk}','note',this.value)"></div>`}).join('');}
+function setDraftWeek(sid,wk,field,val){if(!draftWeekly[sid])draftWeekly[sid]={};if(!draftWeekly[sid][wk])draftWeekly[sid][wk]={};
+  if(field==='progress'){if(val==='')delete draftWeekly[sid][wk].progress;else draftWeekly[sid][wk].progress=Math.max(0,Math.min(100,+val||0))}
+  else{if(val==='')delete draftWeekly[sid][wk].note;else draftWeekly[sid][wk].note=val}
+  if(!Object.keys(draftWeekly[sid][wk]).length)delete draftWeekly[sid][wk];}
 function photosHTML(){return draftPhotos.map((src,i)=>`<div style="position:relative"><img src="${src}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--bdr)"><button class="del-x" style="position:absolute;top:-7px;right:-7px;width:22px;height:22px;font-size:12px" onclick="draftPhotos.splice(${i},1);$('of-photos').innerHTML=photosHTML()">×</button></div>`).join('')}
 function compressImg(file,cb){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height,M=900;if(w>M||h>M){const s=Math.min(M/w,M/h);w=Math.round(w*s);h=Math.round(h*s)}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cb(cv.toDataURL('image/jpeg',0.7))};img.src=ev.target.result};r.readAsDataURL(file)}
 function addPhotos(inp){[...inp.files].forEach(f=>compressImg(f,d=>{draftPhotos.push(d);$('of-photos').innerHTML=photosHTML()}));inp.value=''}
 
 function collectForm(){
-  const _ex=findProd($('of-id').value)||{};
-  const _weekly=Object.assign({},_ex.weekly||{});
-  const _wk=isoWeekKey(new Date());
-  const _wp=$('of-wprog')?$('of-wprog').value:'';const _wn=$('of-wnote')?$('of-wnote').value.trim():'';
-  if(_wp!==''||_wn){_weekly[_wk]={progress:Math.max(0,Math.min(100,+_wp||0)),note:_wn}}
   return{id:$('of-id').value,year:curYear(),month:$('of-month').value,orderNo:$('of-orderNo').value.trim(),
     party:$('of-party').value.trim(),dest:$('of-dest').value.trim(),product:$('of-product').value.trim(),
     qty:$('of-qty').value,vol:$('of-vol').value,value:$('of-value').value,exf:$('of-exf').value,
     startDate:$('of-start').value,stage:$('of-stage').value,priority:$('of-prio').value,
-    supplier:$('of-supplier')?$('of-supplier').value:(_ex.supplier||''),weekly:_weekly,
+    allocations:draftAllocations.filter(a=>a.supplierId),weekly:draftWeekly,
     qc:{status:$('of-qc').value,notes:(findProd($('of-id').value)||{}).qc?.notes||''},
     checklist:draftChecklist,materials:draftMaterials,photos:draftPhotos,notes:$('of-notes').value,
     cancelled:$('of-cancel').checked};
@@ -751,7 +771,15 @@ function resetYear(){confirm2('Clear '+curYear()+' orders?','Removes all product
 function getSuppliers(){if(!PD.suppliers)PD.suppliers=[];return PD.suppliers}
 function findSupplier(id){return getSuppliers().find(s=>s.id===id)}
 function supplierName(id){const s=findSupplier(id);return s?s.name:'(unknown)'}
-function supplierOrders(sid,y){return getProds(y||curYear()).filter(p=>p.supplier===sid&&!p.cancelled)}
+function supplierOrders(sid,y){return getProds(y||curYear()).filter(p=>!p.cancelled&&(p.allocations||[]).some(a=>a.supplierId===sid))}
+function allocQty(p,sid){const a=(p.allocations||[]).find(x=>x.supplierId===sid);return a?(+a.qty||0):0}
+function getWeek(p,sid,wk){return (p.weekly&&p.weekly[sid]&&p.weekly[sid][wk])||null}
+// Migrate legacy single-supplier orders -> allocations[]; legacy order-level weekly -> per-supplier weekly
+function migrateAllocations(){let ch=false;Object.keys(PD.years||{}).forEach(yr=>{(PD.years[yr].prods||[]).forEach(p=>{
+  if(!p.allocations){p.allocations=p.supplier?[{supplierId:p.supplier,qty:p.qty||''}]:[];ch=true}
+  if(p.weekly){const ks=Object.keys(p.weekly);if(ks.length&&ks.some(k=>/^\d{4}-W\d{1,2}$/.test(k))){const sid=p.supplier||(p.allocations[0]&&p.allocations[0].supplierId)||'_';p.weekly={[sid]:p.weekly};ch=true}}
+  if('supplier' in p){delete p.supplier;ch=true}
+})});if(ch)saveAll()}
 
 // ISO-week helpers for weekly progress tracking
 function mondayOf(d){const x=new Date(d);const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);x.setHours(0,0,0,0);return x}
@@ -765,7 +793,7 @@ function weekToday(){selWeek=mondayOf(new Date());render()}
 function renderSuppliers(){
   const y=curYear();const sups=getSuppliers();const wk=curWeekKey();
   const allActive=getProds(y).filter(p=>!p.cancelled);
-  const unalloc=allActive.filter(p=>!p.supplier&&!isShippedStage(p.stage));
+  const unalloc=allActive.filter(p=>!(p.allocations||[]).length&&!isShippedStage(p.stage));
   return `
 <div class="sh"><div><div class="sh-t">Suppliers — ${y}</div><div class="sh-s">${sups.length} supplier${sups.length!==1?'s':''} · production allocation & weekly progress</div></div>
   <button class="btn btn-pri btn-sm" onclick="openSupplier(null)">+ Add Supplier</button></div>
@@ -791,7 +819,7 @@ ${unalloc.length?`<div class="card" style="margin-top:16px;border-left:4px solid
 function supplierTrendBars(s){
   const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));const N=6;const bars=[];
   for(let i=N-1;i>=0;i--){const d=new Date(selWeek);d.setDate(d.getDate()-i*7);const wk=isoWeekKey(d);
-    const vals=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+    const vals=orders.map(p=>{const w=getWeek(p,s.id,wk);return w&&w.progress!=null?+w.progress:0});
     const avg=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
     bars.push({avg,short:d.getDate()+'/'+(d.getMonth()+1),current:wk===curWeekKey()})}
   return `<div style="display:flex;align-items:flex-end;gap:6px;height:56px">${bars.map(b=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px" title="Week of ${b.short}: ${b.avg}%">
@@ -801,8 +829,8 @@ function supplierTrendBars(s){
 }
 function supplierBreakdownCard(y){
   const sups=getSuppliers();
-  const rows=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{name:s.name,orders:o.length,units:o.reduce((a,p)=>a+(+p.qty||0),0),un:false}}).filter(r=>r.orders>0);
-  const un=getProds(y).filter(p=>!p.cancelled&&!p.supplier&&!isShippedStage(p.stage));
+  const rows=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{name:s.name,orders:o.length,units:o.reduce((a,p)=>a+allocQty(p,s.id),0),un:false}}).filter(r=>r.orders>0);
+  const un=getProds(y).filter(p=>!p.cancelled&&!(p.allocations||[]).length&&!isShippedStage(p.stage));
   if(un.length)rows.push({name:'— Unallocated —',orders:un.length,units:un.reduce((a,p)=>a+(+p.qty||0),0),un:true});
   rows.sort((a,b)=>b.units-a.units||b.orders-a.orders);
   const maxU=Math.max(1,...rows.map(r=>r.units));
@@ -817,9 +845,9 @@ function supplierBreakdownCard(y){
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);
   const active=orders.filter(p=>!isShippedStage(p.stage));
-  const units=active.reduce((a,p)=>a+(+p.qty||0),0);
+  const units=active.reduce((a,p)=>a+allocQty(p,s.id),0);
   const overdue=active.filter(p=>{const d=daysUntil(p.exf);return d!==null&&d<0}).length;
-  const wkVals=active.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+  const wkVals=active.map(p=>{const w=getWeek(p,s.id,wk);return w&&w.progress!=null?+w.progress:0});
   const wkAvg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
   const cap=+s.capacity||0;const util=cap?Math.round(units/cap*100):null;
   const utilColor=util==null?'inherit':util>100?'var(--err)':util>=85?'var(--warn)':'var(--ok)';
@@ -831,26 +859,27 @@ function supplierCard(s,wk){
   </div>
   <div style="display:flex;gap:20px;flex-wrap:wrap;margin:14px 0;align-items:center">
     <div><div style="font-size:22px;font-weight:800">${active.length}</div><div style="color:var(--muted);font-size:11.5px">active orders</div></div>
-    <div><div style="font-size:22px;font-weight:800">${units.toLocaleString()}</div><div style="color:var(--muted);font-size:11.5px">units</div></div>
+    <div><div style="font-size:22px;font-weight:800">${units.toLocaleString()}</div><div style="color:var(--muted);font-size:11.5px">units (allocated)</div></div>
     <div><div style="font-size:22px;font-weight:800;color:${overdue?'var(--err)':'inherit'}">${overdue}</div><div style="color:var(--muted);font-size:11.5px">overdue</div></div>
-    <div title="${cap?units.toLocaleString()+' active units of '+cap.toLocaleString()+' units/month capacity':'Set monthly capacity in the supplier profile'}"><div style="font-size:22px;font-weight:800;color:${utilColor}">${util==null?'—':util+'%'}</div><div style="color:var(--muted);font-size:11.5px">capacity used${util!=null&&util>100?' ⚠️':''}</div></div>
+    <div title="${cap?units.toLocaleString()+' allocated units of '+cap.toLocaleString()+' units/month capacity':'Set monthly capacity in the supplier profile'}"><div style="font-size:22px;font-weight:800;color:${utilColor}">${util==null?'—':util+'%'}</div><div style="color:var(--muted);font-size:11.5px">capacity used${util!=null&&util>100?' ⚠️':''}</div></div>
     <div style="flex:1;min-width:150px"><div style="color:var(--muted);font-size:11.5px;margin-bottom:4px">Avg progress this week — <strong>${wkAvg}%</strong></div><div class="pbar"><span style="width:${wkAvg}%"></span></div></div>
   </div>
   ${active.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">📈 Weekly progress trend — avg % (last 6 weeks)</div>${supplierTrendBars(s)}</div>`:''}
-  ${active.length?`<div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Stage</th><th>Overall</th><th>This week %</th><th>Deadline</th></tr></thead><tbody>
-    ${active.map(p=>{const d=daysUntil(p.exf);const wp=(p.weekly&&p.weekly[wk]&&p.weekly[wk].progress!=null)?p.weekly[wk].progress:'';
-      return `<tr><td style="cursor:pointer" onclick="openOrder('${p.id}')"><strong>${esc(p.orderNo||'—')}</strong></td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td>
+  ${active.length?`<div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Alloc Qty</th><th>Stage</th><th>Overall</th><th>This week %</th><th>Deadline</th></tr></thead><tbody>
+    ${active.map(p=>{const d=daysUntil(p.exf);const w=getWeek(p,s.id,wk);const wp=w&&w.progress!=null?w.progress:'';const shared=(p.allocations||[]).length>1;
+      return `<tr><td style="cursor:pointer" onclick="openOrder('${p.id}')"><strong>${esc(p.orderNo||'—')}</strong>${shared?' <span class="tag" title="Shared across: '+esc((p.allocations||[]).map(a=>supplierName(a.supplierId)).join(', '))+'">🔀 split</span>':''}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td>
+      <td>${allocQty(p,s.id)?allocQty(p,s.id).toLocaleString():'—'}</td>
       <td><span class="badge b-stage">${esc(p.stage)}</span></td>
       <td style="min-width:96px"><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
-      <td><input type="number" min="0" max="100" value="${wp}" placeholder="—" style="width:72px;padding:5px" onchange="setWeekProgress('${p.id}','${wk}',this.value)"></td>
+      <td><input type="number" min="0" max="100" value="${wp}" placeholder="—" style="width:72px;padding:5px" onchange="setWeekProgress('${p.id}','${s.id}','${wk}',this.value)"></td>
       <td>${fmtDate(p.exf)} ${d!==null&&d<0?'<span class="badge b-err">'+Math.abs(d)+'d</span>':''}</td></tr>`}).join('')}
-  </tbody></table></div>`:'<div style="font-size:12.5px;color:var(--muted)">No active orders allocated. Use the Unallocated table below or set the supplier on an order.</div>'}
+  </tbody></table></div>`:'<div style="font-size:12.5px;color:var(--muted)">No active orders allocated. Use the Unallocated table below, or split an order across suppliers in the order editor.</div>'}
   </div>`;
 }
 
-function assignSupplier(orderId,supId){const p=findProd(orderId);if(!p)return;p.supplier=supId;p.updatedAt=Date.now();saveAll();render();toast(supId?'Allocated to '+supplierName(supId):'Unassigned')}
-function setWeekProgress(orderId,wk,val){const p=findProd(orderId);if(!p)return;if(!p.weekly)p.weekly={};
-  if(val===''||val==null){delete p.weekly[wk]}else{const n=Math.max(0,Math.min(100,+val||0));p.weekly[wk]=Object.assign({},p.weekly[wk],{progress:n})}
+function assignSupplier(orderId,supId){const p=findProd(orderId);if(!p||!supId)return;p.allocations=p.allocations||[];if(!p.allocations.some(a=>a.supplierId===supId))p.allocations.push({supplierId:supId,qty:p.qty||''});p.updatedAt=Date.now();saveAll();render();toast('Allocated to '+supplierName(supId))}
+function setWeekProgress(orderId,sid,wk,val){const p=findProd(orderId);if(!p)return;if(!p.weekly)p.weekly={};if(!p.weekly[sid])p.weekly[sid]={};
+  if(val===''||val==null){delete p.weekly[sid][wk]}else{const n=Math.max(0,Math.min(100,+val||0));p.weekly[sid][wk]=Object.assign({},p.weekly[sid][wk],{progress:n})}
   p.updatedAt=Date.now();saveAll();toast('Week progress saved')}
 
 // ── WhatsApp / email-ready text export of a supplier's weekly targets ─────────
@@ -859,13 +888,13 @@ function buildSupplierWeekText(sid){const s=findSupplier(sid);if(!s)return '';co
   L.push('*'+s.name+' — Weekly Production Update*');
   L.push('Week: '+weekRangeLabel(selWeek));L.push('');
   if(!orders.length)L.push('No active orders allocated.');
-  orders.forEach((p,i)=>{const w=p.weekly&&p.weekly[wk];const wp=w&&w.progress!=null?w.progress+'%':'—';const d=daysUntil(p.exf);
+  orders.forEach((p,i)=>{const w=getWeek(p,sid,wk);const wp=w&&w.progress!=null?w.progress+'%':'—';const d=daysUntil(p.exf);const q=allocQty(p,sid);
     const due=p.exf?(fmtDate(p.exf)+(d!=null?(d<0?' ('+Math.abs(d)+'d LATE)':d===0?' (today)':' (in '+d+'d)'):'')):'no date';
     L.push((i+1)+'. '+(p.orderNo||'—')+' · '+(p.party||''));
-    L.push('   '+(p.product||'(item)')+(p.qty?' — '+(+p.qty).toLocaleString()+' pcs':''));
+    L.push('   '+(p.product||'(item)')+(q?' — '+q.toLocaleString()+' pcs (your share)':''));
     L.push('   Stage: '+p.stage+' | This week: '+wp+' | Due: '+due);
     if(w&&w.note)L.push('   Note: '+w.note);});
-  if(orders.length){const v=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+  if(orders.length){const v=orders.map(p=>{const w=getWeek(p,sid,wk);return w&&w.progress!=null?+w.progress:0});
     L.push('');L.push('Avg progress this week: '+Math.round(v.reduce((a,b)=>a+b,0)/v.length)+'% across '+orders.length+' order(s)');}
   return L.join('\n');}
 function fallbackCopy(txt,cb){const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}document.body.removeChild(ta);if(ok&&cb)cb();else showCopyModal(txt);}
@@ -875,23 +904,23 @@ function copySupplierWeek(sid){const txt=buildSupplierWeekText(sid);const done=(
 function showCopyModal(txt){$('cp-text').value=txt;openModal('cp-ov')}
 
 // ── Printable weekly reports (for sharing targets/progress with each factory) ──
-const _supWeekHead='<thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Target Qty</th><th>Stage</th><th>Overall</th><th>This Week</th><th>Ex-Factory</th><th>Week Note</th></tr></thead>';
-function _supWeekRow(p,wk){const w=p.weekly&&p.weekly[wk];const wp=w&&w.progress!=null?w.progress+'%':'—';const wn=w&&w.note?esc(w.note):'';const d=daysUntil(p.exf);const late=d!==null&&d<0;
-  return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${p.qty?(+p.qty).toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td><strong>${wp}</strong></td><td class="${late?'over':''}">${fmtDate(p.exf)}${late?' ('+Math.abs(d)+'d late)':''}</td><td>${wn}</td></tr>`}
+const _supWeekHead='<thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Alloc Qty</th><th>Stage</th><th>Overall</th><th>This Week</th><th>Ex-Factory</th><th>Week Note</th></tr></thead>';
+function _supWeekRow(p,sid,wk){const w=getWeek(p,sid,wk);const wp=w&&w.progress!=null?w.progress+'%':'—';const wn=w&&w.note?esc(w.note):'';const d=daysUntil(p.exf);const late=d!==null&&d<0;const q=allocQty(p,sid);
+  return `<tr><td>${esc(p.orderNo||'—')}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td><td>${q?q.toLocaleString():'—'}</td><td>${esc(p.stage)}</td><td>${stageProgress(p.stage)}%</td><td><strong>${wp}</strong></td><td class="${late?'over':''}">${fmtDate(p.exf)}${late?' ('+Math.abs(d)+'d late)':''}</td><td>${wn}</td></tr>`}
 function printSupplierWeek(sid){const s=findSupplier(sid);if(!s)return;const wk=curWeekKey();
   const orders=supplierOrders(sid).filter(p=>!isShippedStage(p.stage));
-  const units=orders.reduce((a,p)=>a+(+p.qty||0),0);
-  const wkVals=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+  const units=orders.reduce((a,p)=>a+allocQty(p,sid),0);
+  const wkVals=orders.map(p=>{const w=getWeek(p,sid,wk);return w&&w.progress!=null?+w.progress:0});
   const avg=wkVals.length?Math.round(wkVals.reduce((a,b)=>a+b,0)/wkVals.length):0;
   const body=`<div style="margin:0 0 14px;font-size:13px;line-height:1.7">
     <strong>Supplier:</strong> ${esc(s.name)}${s.contact?' · '+esc(s.contact):''}${s.phone?' · '+esc(s.phone):''}${s.location?' · '+esc(s.location):''}<br>
     <strong>Week:</strong> ${weekRangeLabel(selWeek)} (${wk}) &nbsp;·&nbsp; <strong>${orders.length}</strong> active orders &nbsp;·&nbsp; <strong>${units.toLocaleString()}</strong> units &nbsp;·&nbsp; avg progress this week <strong>${avg}%</strong></div>
-    <table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,wk)).join('')||'<tr><td colspan="9">No active orders allocated.</td></tr>'}</tbody></table>`;
+    <table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,sid,wk)).join('')||'<tr><td colspan="9">No active orders allocated.</td></tr>'}</tbody></table>`;
   printWindow('Weekly Production Report — '+s.name,body);
 }
 function printAllSuppliersWeek(){const wk=curWeekKey();const sups=getSuppliers();let body=`<div style="margin:0 0 6px;font-size:13px"><strong>Week:</strong> ${weekRangeLabel(selWeek)} (${wk})</div>`;let any=false;
   sups.forEach(s=>{const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));if(!orders.length)return;any=true;
-    body+=`<h2 style="font-size:15px;margin:18px 0 6px">👷 ${esc(s.name)}${s.location?' <span style="font-weight:400;color:#666;font-size:12px">— '+esc(s.location)+'</span>':''}</h2><table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,wk)).join('')}</tbody></table>`});
+    body+=`<h2 style="font-size:15px;margin:18px 0 6px">👷 ${esc(s.name)}${s.location?' <span style="font-weight:400;color:#666;font-size:12px">— '+esc(s.location)+'</span>':''}</h2><table>${_supWeekHead}<tbody>${orders.map(p=>_supWeekRow(p,s.id,wk)).join('')}</tbody></table>`});
   if(!any)body+='<p>No suppliers have active allocated orders.</p>';
   printWindow('Supplier Weekly Progress',body);
 }
@@ -918,9 +947,9 @@ function saveSupplier(){const name=$('sf-name').value.trim();if(!name){toast('Su
   const obj={id:$('sf-id').value,name:name,contact:$('sf-contact').value.trim(),phone:$('sf-phone').value.trim(),email:$('sf-email').value.trim(),location:$('sf-location').value.trim(),specialty:$('sf-specialty').value.trim(),capacity:$('sf-capacity').value,status:$('sf-status').value,notes:$('sf-notes').value};
   const list=getSuppliers();const ex=list.find(x=>x.id===obj.id);if(ex)Object.assign(ex,obj);else list.push(obj);
   saveAll();closeModal('sup-ov');render();toast('✅ Supplier saved')}
-function deleteSupplier(){const id=$('sf-id').value;let n=0;Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if(p.supplier===id)n++}));
-  confirm2('Delete supplier?',(n?n+' allocated order(s) across all years will be unassigned. ':'')+'This cannot be undone.',()=>{
-    Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if(p.supplier===id)p.supplier=''}));
+function deleteSupplier(){const id=$('sf-id').value;let n=0;Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if((p.allocations||[]).some(a=>a.supplierId===id))n++}));
+  confirm2('Delete supplier?',(n?n+' allocated order(s) will have this supplier removed (their other suppliers stay). ':'')+'This cannot be undone.',()=>{
+    Object.keys(PD.years).forEach(yr=>(PD.years[yr].prods||[]).forEach(p=>{if(p.allocations)p.allocations=p.allocations.filter(a=>a.supplierId!==id);if(p.weekly&&p.weekly[id])delete p.weekly[id]}));
     PD.suppliers=getSuppliers().filter(x=>x.id!==id);saveAll();closeModal('sup-ov');render();toast('Supplier deleted')})}
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -938,7 +967,7 @@ function prodFromShipment(y,s){const stage=s.cancelled?stages()[0]:(s.shipped===
   return{id:uid(),year:y,month:s.month||'',orderNo:s.orderNo||'',party:s.party||'',dest:s.dest||'',product:'',
     qty:'',vol:s.vol||'',value:s.iamt||s.oamt||'',exf:(/^\d{4}-\d{2}-\d{2}$/.test(s.exf)?s.exf:''),startDate:todayISO(),
     stage:stage,progress:stageProgress(stage),priority:'Normal',checklist:[],materials:[],qc:{status:'Pending',notes:''},
-    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled,supplier:'',weekly:{}}}
+    photos:[],notes:s.notes||'',source:'export-manager',cancelled:!!s.cancelled,allocations:[],weekly:{}}}
 
 function mergeOrders(y,shipments){const arr=getProds(y);const byNo={};arr.forEach(p=>{if(p.orderNo)byNo[p.orderNo]=p});
   let added=0,updated=0;
