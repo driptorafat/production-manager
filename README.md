@@ -20,7 +20,10 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
 - **Suppliers** — supplier/factory database (contact, location, specialty, capacity).
   See which supplier is making which orders, allocate orders to suppliers, and record
   each order's **weekly progress %** per supplier with a week-by-week navigator and
-  per-supplier averages. Unallocated orders are flagged for quick assignment.
+  per-supplier averages, plus a **6-week trend sparkline** on each supplier card.
+  Unallocated orders are flagged for quick assignment. Filter the Orders table by
+  supplier, see a **Production by Supplier** breakdown on the dashboard, and print
+  per-supplier (or all-supplier) **weekly progress reports** for sharing with factories.
 - **Deadlines** — active orders grouped Overdue / This week / Next 30 days / Later.
 - **Reports** — printable Production Status, Deadline/WIP, and Outstanding Materials.
 - **Configurable pipeline** — rename/reorder/add/remove stages (the last stage = "shipped").

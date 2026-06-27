@@ -430,8 +430,11 @@ ${all.length===0?`<div class="note">👋 No production orders yet for ${y}. Clic
   </div>
 </div>
 
-<div class="card" style="margin-top:16px"><div class="card-title">Orders by Ex-Factory Month</div>
-  <div class="bars">${MONTHS.map((m,i)=>monthCounts[i]?`<div class="bar-row"><span>${m.slice(0,3)}</span><div class="bar-track"><div class="bar-fill" style="width:${monthCounts[i]/maxM*100}%"></div></div><span style="text-align:right">${monthCounts[i]}</span></div>`:'').join('')||'<div style="color:var(--muted);font-size:13px">No data.</div>'}</div>
+<div class="g2" style="margin-top:16px">
+  <div class="card"><div class="card-title">Orders by Ex-Factory Month</div>
+    <div class="bars">${MONTHS.map((m,i)=>monthCounts[i]?`<div class="bar-row"><span>${m.slice(0,3)}</span><div class="bar-track"><div class="bar-fill" style="width:${monthCounts[i]/maxM*100}%"></div></div><span style="text-align:right">${monthCounts[i]}</span></div>`:'').join('')||'<div style="color:var(--muted);font-size:13px">No data.</div>'}</div>
+  </div>
+  ${supplierBreakdownCard(y)}
 </div>`;
 }
 
@@ -782,6 +785,32 @@ ${unalloc.length?`<div class="card" style="margin-top:16px;border-left:4px solid
   </tbody></table></div>${sups.length?'':'<div style="font-size:12px;color:var(--muted);margin-top:8px">Add a supplier first to allocate these orders.</div>'}</div>`:''}`;
 }
 
+function supplierTrendBars(s){
+  const orders=supplierOrders(s.id).filter(p=>!isShippedStage(p.stage));const N=6;const bars=[];
+  for(let i=N-1;i>=0;i--){const d=new Date(selWeek);d.setDate(d.getDate()-i*7);const wk=isoWeekKey(d);
+    const vals=orders.map(p=>(p.weekly&&p.weekly[wk]&&+p.weekly[wk].progress)||0);
+    const avg=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
+    bars.push({avg,short:d.getDate()+'/'+(d.getMonth()+1),current:wk===curWeekKey()})}
+  return `<div style="display:flex;align-items:flex-end;gap:6px;height:56px">${bars.map(b=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px" title="Week of ${b.short}: ${b.avg}%">
+    <div style="font-size:9px;color:var(--muted)">${b.avg}%</div>
+    <div style="width:100%;height:34px;background:var(--divider);border-radius:3px;display:flex;align-items:flex-end;overflow:hidden"><div style="width:100%;height:${b.avg}%;background:${b.current?'var(--acc)':'var(--pri)'};border-radius:3px"></div></div>
+    <span style="font-size:9px;color:${b.current?'var(--acc)':'var(--muted)'};font-weight:${b.current?'700':'400'}">${b.short}</span></div>`).join('')}</div>`;
+}
+function supplierBreakdownCard(y){
+  const sups=getSuppliers();
+  const rows=sups.map(s=>{const o=supplierOrders(s.id,y).filter(p=>!isShippedStage(p.stage));return{name:s.name,orders:o.length,units:o.reduce((a,p)=>a+(+p.qty||0),0),un:false}}).filter(r=>r.orders>0);
+  const un=getProds(y).filter(p=>!p.cancelled&&!p.supplier&&!isShippedStage(p.stage));
+  if(un.length)rows.push({name:'— Unallocated —',orders:un.length,units:un.reduce((a,p)=>a+(+p.qty||0),0),un:true});
+  rows.sort((a,b)=>b.units-a.units||b.orders-a.orders);
+  const maxU=Math.max(1,...rows.map(r=>r.units));
+  return `<div class="card"><div class="card-title">Production by Supplier</div>
+    ${rows.length?rows.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer" onclick="go('suppliers')" title="${esc(r.name)}: ${r.orders} active orders, ${r.units.toLocaleString()} units">
+      <span style="width:118px;flex-shrink:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${r.un?';color:var(--muted)':''}">${esc(r.name)}</span>
+      <div style="flex:1" class="bar-track"><div class="bar-fill" style="width:${Math.round(r.units/maxU*100)}%${r.un?';background:var(--muted)':''}"></div></div>
+      <span style="width:120px;flex-shrink:0;text-align:right;font-size:11.5px;color:var(--muted)">${r.orders} ord · ${r.units.toLocaleString()} u</span></div>`).join('')
+      :(sups.length?'<div style="color:var(--muted);font-size:13px;padding:8px 0">No active orders allocated yet.</div>':'<div style="color:var(--muted);font-size:13px;padding:8px 0">No suppliers yet — add them in the <strong>Suppliers</strong> tab.</div>')}
+  </div>`;
+}
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);
   const active=orders.filter(p=>!isShippedStage(p.stage));
@@ -801,6 +830,7 @@ function supplierCard(s,wk){
     <div><div style="font-size:22px;font-weight:800;color:${overdue?'var(--err)':'inherit'}">${overdue}</div><div style="color:var(--muted);font-size:11.5px">overdue</div></div>
     <div style="flex:1;min-width:150px"><div style="color:var(--muted);font-size:11.5px;margin-bottom:4px">Avg progress this week — <strong>${wkAvg}%</strong></div><div class="pbar"><span style="width:${wkAvg}%"></span></div></div>
   </div>
+  ${active.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">📈 Weekly progress trend — avg % (last 6 weeks)</div>${supplierTrendBars(s)}</div>`:''}
   ${active.length?`<div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Stage</th><th>Overall</th><th>This week %</th><th>Deadline</th></tr></thead><tbody>
     ${active.map(p=>{const d=daysUntil(p.exf);const wp=(p.weekly&&p.weekly[wk]&&p.weekly[wk].progress!=null)?p.weekly[wk].progress:'';
       return `<tr><td style="cursor:pointer" onclick="openOrder('${p.id}')"><strong>${esc(p.orderNo||'—')}</strong></td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td>
