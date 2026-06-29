@@ -480,6 +480,7 @@ function dropCard(e,stageName){e.preventDefault();document.querySelectorAll('.co
 //  ORDERS TABLE
 // ════════════════════════════════════════════════════════════════════════════
 let ordFilter={q:'',stage:'',prio:'',sup:''};
+let schedFilter={sup:'',showDone:true};
 function renderOrders(){
   const y=curYear();let list=getProds(y).slice();
   return `
@@ -890,12 +891,12 @@ function ganttChart(entries,opts){opts=opts||{};
   const ROW=26,H=items.length*ROW;
   let grid='';const gm=new Date(min.getFullYear(),min.getMonth(),1);
   while(gm<=max){const left=pos(gm);if(left>=0&&left<=100)grid+=`<div style="position:absolute;left:${left}%;top:0;height:${H}px;width:1px;background:var(--divider)"></div><div style="position:absolute;left:${left}%;top:-15px;font-size:9px;color:var(--muted);white-space:nowrap;transform:translateX(3px)">${gm.toLocaleDateString(undefined,{month:'short',year:'2-digit'})}</div>`;gm.setMonth(gm.getMonth()+1)}
-  const tl=pos(today);const todayM=(tl>=0&&tl<=100)?`<div style="position:absolute;left:${tl}%;top:0;height:${H}px;width:2px;background:var(--acc);z-index:1"></div><div style="position:absolute;left:${tl}%;top:-15px;font-size:9px;color:var(--acc);font-weight:700;transform:translateX(3px)">today</div>`:'';
+  const tl=pos(today);const todayM=(tl>=0&&tl<=100)?`<div style="position:absolute;left:${tl}%;top:0;height:${H}px;width:2px;background:var(--acc);z-index:1"></div><div style="position:absolute;left:${tl}%;top:${H+1}px;font-size:9px;color:var(--acc);font-weight:700;transform:translateX(-50%)">today</div>`:'';
   const bars=items.map((it,i)=>{const L=pos(it.s),W=Math.max(pos(it.e)-L,1.2);
     return `<div onclick="openOrder('${it.p.id}')" title="${labelFn(it.p,it.en.sid)}: ${fmtDate(it.sISO)} → ${fmtDate(it.eISO)}" style="position:absolute;top:${i*ROW+5}px;left:${L}%;width:${W}%;height:${ROW-12}px;background:${colorFn(it.p,it.en.sid)};border-radius:4px;cursor:pointer;min-width:6px;z-index:2"></div>`}).join('');
   const labels=items.map(it=>`<div style="height:${ROW}px;display:flex;align-items:center;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${labelFn(it.p,it.en.sid)}">${labelFn(it.p,it.en.sid)}</div>`).join('');
   const labelW=opts.labelWidth||104;
-  return `<div style="overflow-x:auto"><div style="display:flex;gap:10px;min-width:560px;padding-top:16px">
+  return `<div style="overflow-x:auto"><div style="display:flex;gap:10px;min-width:560px;padding-top:16px;padding-bottom:14px">
     <div style="width:${labelW}px;flex-shrink:0">${labels}</div>
     <div style="flex:1;position:relative;height:${H}px">${grid}${todayM}${bars}</div>
   </div></div>${opts.legend||''}${skipped?`<div style="font-size:10.5px;color:var(--muted);margin-top:6px">${skipped} order(s) without dates / older completed not shown.</div>`:''}`;
@@ -903,12 +904,19 @@ function ganttChart(entries,opts){opts=opts||{};
 const GANTT_STATUS_LEGEND=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-top:8px"><span><span style="display:inline-block;width:10px;height:10px;background:var(--pri);border-radius:2px;vertical-align:-1px"></span> in progress</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--err);border-radius:2px;vertical-align:-1px"></span> overdue</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--ok);border-radius:2px;vertical-align:-1px"></span> completed (recent)</span></div>`;
 function supplierGantt(orders){return ganttChart(orders.map(p=>({p})),{legend:GANTT_STATUS_LEGEND})}
 function renderSchedule(){
-  const y=curYear();const orders=getProds(y).filter(p=>!p.cancelled&&(p.allocations||[]).length);
-  const entries=[];orders.forEach(p=>(p.allocations||[]).forEach(a=>{if(a.supplierId)entries.push({p,sid:a.supplierId})}));
+  const y=curYear();const sups=getSuppliers();const orders=getProds(y).filter(p=>!p.cancelled&&(p.allocations||[]).length);
+  let entries=[];orders.forEach(p=>(p.allocations||[]).forEach(a=>{if(a.supplierId)entries.push({p,sid:a.supplierId})}));
+  if(schedFilter.sup)entries=entries.filter(e=>e.sid===schedFilter.sup);
+  if(!schedFilter.showDone)entries=entries.filter(e=>!isClosed(e.p));
   const usedSids=[...new Set(entries.map(e=>e.sid))];
   const legend=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:12px">${usedSids.map(sid=>`<span><span style="display:inline-block;width:11px;height:11px;background:${supplierColor(sid)};border-radius:2px;vertical-align:-1px"></span> ${esc(supplierName(sid))}</span>`).join('')}</div>`;
+  const controls=`<div class="toolbar">
+    <select onchange="schedFilter.sup=this.value;render()"><option value="">All suppliers</option>${sups.map(s=>`<option value="${s.id}" ${schedFilter.sup===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer"><input type="checkbox" ${schedFilter.showDone?'checked':''} onchange="schedFilter.showDone=this.checked;render()" style="width:auto"> Show completed (recent)</label>
+  </div>`;
   return `<div class="sh"><div><div class="sh-t">Schedule — ${y}</div><div class="sh-s">Every supplier's orders on one timeline · bars coloured by supplier · overlapping same-colour bars = that supplier is double-booked</div></div></div>
-  <div class="card">${entries.length?ganttChart(entries,{label:(p,sid)=>esc(p.orderNo||'—')+' · '+esc(supplierName(sid)),color:(p,sid)=>supplierColor(sid),labelWidth:190,sort:(a,b)=>{const an=supplierName(a.en.sid),bn=supplierName(b.en.sid);return an.localeCompare(bn)||a.s-b.s},legend:legend}):'<div class="empty"><div class="empty-ico">📆</div>No allocated orders to schedule yet. Allocate orders to suppliers first.</div>'}</div>`;
+  ${controls}
+  <div class="card">${entries.length?ganttChart(entries,{label:(p,sid)=>esc(p.orderNo||'—')+' · '+esc(supplierName(sid)),color:(p,sid)=>supplierColor(sid),labelWidth:190,sort:(a,b)=>{const an=supplierName(a.en.sid),bn=supplierName(b.en.sid);return an.localeCompare(bn)||a.s-b.s},legend:legend}):'<div class="empty"><div class="empty-ico">📆</div>'+(schedFilter.sup||!schedFilter.showDone?'No orders match the current filters.':'No allocated orders to schedule yet. Allocate orders to suppliers first.')+'</div>'}</div>`;
 }
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);

@@ -31,7 +31,7 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
   appear in green, ending at their actual ship date).
 - **Schedule** — a combined Gantt of every supplier's orders on one shared timeline,
   colour-coded by supplier, so org-wide capacity clashes (a supplier double-booked
-  across overlapping orders) jump out.
+  across overlapping orders) jump out. Filter by supplier and toggle completed orders.
   Unallocated orders are flagged for quick assignment. Filter the Orders table by
   supplier, see a **Production by Supplier** breakdown on the dashboard, and print
   per-supplier (or all-supplier) **weekly progress reports** for sharing with factories.
