@@ -25,7 +25,9 @@ no server, no dependencies). Data is stored locally in IndexedDB and synced to t
   and each supplier reports their own weekly progress on their share.
   See which supplier is making which orders, allocate orders to suppliers, and record
   each order's **weekly progress %** per supplier with a week-by-week navigator and
-  per-supplier averages, plus a **6-week trend sparkline** on each supplier card.
+  per-supplier averages, plus a **6-week trend sparkline** and a **Gantt order
+  timeline** (start → ex-factory finish, with a today marker) on each supplier card
+  so overlapping/concurrent orders are obvious at a glance.
   Unallocated orders are flagged for quick assignment. Filter the Orders table by
   supplier, see a **Production by Supplier** breakdown on the dashboard, and print
   per-supplier (or all-supplier) **weekly progress reports** for sharing with factories.
