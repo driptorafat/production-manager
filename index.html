@@ -350,7 +350,7 @@ function setTheme(t){$('root-html').setAttribute('data-theme',t);localStorage.se
 
 // ── Routing ──────────────────────────────────────────────────────────────────
 const ROUTES=[['dashboard','📊','Dashboard'],['board','🗂️','Production Board'],['orders','📋','Orders'],
-  ['suppliers','👷','Suppliers'],['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
+  ['suppliers','👷','Suppliers'],['schedule','📆','Schedule'],['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
 let route='dashboard';
 function go(r){route=r;document.getElementById('sidebar').classList.remove('open');render()}
 function renderNav(){$('nav').innerHTML=ROUTES.map(([id,ic,lbl])=>
@@ -370,6 +370,7 @@ function render(){
   else if(route==='board')c.innerHTML=renderBoard();
   else if(route==='orders'){c.innerHTML=renderOrders();paintOrders()}
   else if(route==='suppliers'){c.innerHTML=renderSuppliers()}
+  else if(route==='schedule')c.innerHTML=renderSchedule();
   else if(route==='calendar')c.innerHTML=renderCalendar();
   else if(route==='reports')c.innerHTML=renderReports();
   else if(route==='settings')c.innerHTML=renderSettings();
@@ -866,36 +867,48 @@ function supplierListTable(y){const sups=getSuppliers();if(!sups.length)return '
   <div style="font-size:11px;color:var(--muted);margin-top:8px">${totalUnits?'Order share = allocated units ÷ all allocated active units ('+totalUnits.toLocaleString()+' pcs). Click a row to jump to the supplier.':'Allocate orders to suppliers to see order share.'}</div>
   </div>`;
 }
-function supplierGantt(orders){
-  const parse=s=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))return null;const d=new Date(s+'T00:00:00');return isNaN(d)?null:d};
-  const items=orders.filter(p=>parse(p.exf)).map(p=>({p,s:parse(p.startDate)||parse(p.exf),e:parse(p.exf)}));
-  const skipped=orders.length-items.length;
-  if(!items.length)return '<div style="font-size:12px;color:var(--muted)">No orders with a finish (ex-factory) date to chart yet.</div>';
+const GANTT_PALETTE=['#3b82f6','#a855f7','#06b6d4','#f59e0b','#10b981','#ec4899','#ef4444','#14b8a6','#8b5cf6','#eab308'];
+function supplierColor(sid){const i=getSuppliers().findIndex(s=>s.id===sid);return GANTT_PALETTE[(i<0?0:i)%GANTT_PALETTE.length]}
+// Generic Gantt. entries:[{p,sid?}]. Bars run start→finish; finish = actual ship date for
+// completed orders (else ex-factory). Completed orders are shown only if finished recently.
+// opts: {label(p,sid), color(p,sid), labelWidth, legend, sort, recentDays}
+function ganttChart(entries,opts){opts=opts||{};
   const today=new Date();today.setHours(0,0,0,0);
+  const parse=s=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))return null;const d=new Date(s+'T00:00:00');return isNaN(d)?null:d};
+  const labelFn=opts.label||((p)=>esc(p.orderNo||'—'));
+  const colorFn=opts.color||((p)=>{const e=parse(p.exf);return isClosed(p)?'var(--ok)':(e&&e<today)?'var(--err)':'var(--pri)'});
+  const cutoff=new Date(today);cutoff.setDate(cutoff.getDate()-(opts.recentDays||60));
+  let items=entries.map(en=>{const p=en.p;const finISO=(isClosed(p)&&/^\d{4}-\d{2}-\d{2}$/.test(p.shipDate||''))?p.shipDate:p.exf;const e=parse(finISO);const sISO=/^\d{4}-\d{2}-\d{2}$/.test(p.startDate||'')?p.startDate:finISO;const s=parse(sISO);return{en,p,s,e,sISO,eISO:finISO}}).filter(it=>it.e&&it.s&&(!isClosed(it.p)||it.e>=cutoff));
+  const skipped=entries.length-items.length;
+  if(!items.length)return '<div style="font-size:12px;color:var(--muted)">No dated orders to chart yet.</div>';
   let min=items[0].s,max=items[0].e;
-  items.forEach(it=>{if(it.s<min)min=it.s;if(it.e>max)max=it.e;if(it.s>max)max=it.s});
+  items.forEach(it=>{if(it.s<min)min=it.s;if(it.e<min)min=it.e;if(it.e>max)max=it.e;if(it.s>max)max=it.s});
   if(today<min)min=today;if(today>max)max=today;
   min=new Date(min);min.setDate(min.getDate()-3);max=new Date(max);max.setDate(max.getDate()+3);
-  const span=Math.max(1,(max-min)/86400000);
-  const pos=d=>(d-min)/86400000/span*100;
-  items.sort((a,b)=>a.s-b.s||a.e-b.e);
+  const span=Math.max(1,(max-min)/86400000);const pos=d=>(d-min)/86400000/span*100;
+  items.sort(opts.sort||((a,b)=>a.s-b.s||a.e-b.e));
   const ROW=26,H=items.length*ROW;
   let grid='';const gm=new Date(min.getFullYear(),min.getMonth(),1);
   while(gm<=max){const left=pos(gm);if(left>=0&&left<=100)grid+=`<div style="position:absolute;left:${left}%;top:0;height:${H}px;width:1px;background:var(--divider)"></div><div style="position:absolute;left:${left}%;top:-15px;font-size:9px;color:var(--muted);white-space:nowrap;transform:translateX(3px)">${gm.toLocaleDateString(undefined,{month:'short',year:'2-digit'})}</div>`;gm.setMonth(gm.getMonth()+1)}
   const tl=pos(today);const todayM=(tl>=0&&tl<=100)?`<div style="position:absolute;left:${tl}%;top:0;height:${H}px;width:2px;background:var(--acc);z-index:1"></div><div style="position:absolute;left:${tl}%;top:-15px;font-size:9px;color:var(--acc);font-weight:700;transform:translateX(3px)">today</div>`:'';
-  const bars=items.map((it,i)=>{const L=pos(it.s),W=Math.max(pos(it.e)-L,1.2);const overdue=it.e<today&&!isClosed(it.p);const done=isClosed(it.p);const color=done?'var(--ok)':overdue?'var(--err)':'var(--pri)';
-    return `<div onclick="openOrder('${it.p.id}')" title="${esc(it.p.orderNo||'')}: ${fmtDate(it.p.startDate)} → ${fmtDate(it.p.exf)}${overdue?' (overdue)':done?' (completed)':''}" style="position:absolute;top:${i*ROW+5}px;left:${L}%;width:${W}%;height:${ROW-12}px;background:${color};border-radius:4px;cursor:pointer;min-width:6px;z-index:2"></div>`}).join('');
-  const labels=items.map(it=>`<div style="height:${ROW}px;display:flex;align-items:center;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(it.p.orderNo||'')}">${esc(it.p.orderNo||'—')}</div>`).join('');
-  return `<div style="overflow-x:auto"><div style="display:flex;gap:10px;min-width:520px;padding-top:16px">
-    <div style="width:104px;flex-shrink:0">${labels}</div>
+  const bars=items.map((it,i)=>{const L=pos(it.s),W=Math.max(pos(it.e)-L,1.2);
+    return `<div onclick="openOrder('${it.p.id}')" title="${labelFn(it.p,it.en.sid)}: ${fmtDate(it.sISO)} → ${fmtDate(it.eISO)}" style="position:absolute;top:${i*ROW+5}px;left:${L}%;width:${W}%;height:${ROW-12}px;background:${colorFn(it.p,it.en.sid)};border-radius:4px;cursor:pointer;min-width:6px;z-index:2"></div>`}).join('');
+  const labels=items.map(it=>`<div style="height:${ROW}px;display:flex;align-items:center;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${labelFn(it.p,it.en.sid)}">${labelFn(it.p,it.en.sid)}</div>`).join('');
+  const labelW=opts.labelWidth||104;
+  return `<div style="overflow-x:auto"><div style="display:flex;gap:10px;min-width:560px;padding-top:16px">
+    <div style="width:${labelW}px;flex-shrink:0">${labels}</div>
     <div style="flex:1;position:relative;height:${H}px">${grid}${todayM}${bars}</div>
-  </div></div>
-  <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-top:8px">
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--pri);border-radius:2px;vertical-align:-1px"></span> in progress</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--err);border-radius:2px;vertical-align:-1px"></span> overdue</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--ok);border-radius:2px;vertical-align:-1px"></span> completed</span>
-    ${skipped?`<span>· ${skipped} order(s) without a finish date not shown</span>`:''}
-  </div>`;
+  </div></div>${opts.legend||''}${skipped?`<div style="font-size:10.5px;color:var(--muted);margin-top:6px">${skipped} order(s) without dates / older completed not shown.</div>`:''}`;
+}
+const GANTT_STATUS_LEGEND=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-top:8px"><span><span style="display:inline-block;width:10px;height:10px;background:var(--pri);border-radius:2px;vertical-align:-1px"></span> in progress</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--err);border-radius:2px;vertical-align:-1px"></span> overdue</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--ok);border-radius:2px;vertical-align:-1px"></span> completed (recent)</span></div>`;
+function supplierGantt(orders){return ganttChart(orders.map(p=>({p})),{legend:GANTT_STATUS_LEGEND})}
+function renderSchedule(){
+  const y=curYear();const orders=getProds(y).filter(p=>!p.cancelled&&(p.allocations||[]).length);
+  const entries=[];orders.forEach(p=>(p.allocations||[]).forEach(a=>{if(a.supplierId)entries.push({p,sid:a.supplierId})}));
+  const usedSids=[...new Set(entries.map(e=>e.sid))];
+  const legend=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:12px">${usedSids.map(sid=>`<span><span style="display:inline-block;width:11px;height:11px;background:${supplierColor(sid)};border-radius:2px;vertical-align:-1px"></span> ${esc(supplierName(sid))}</span>`).join('')}</div>`;
+  return `<div class="sh"><div><div class="sh-t">Schedule — ${y}</div><div class="sh-s">Every supplier's orders on one timeline · bars coloured by supplier · overlapping same-colour bars = that supplier is double-booked</div></div></div>
+  <div class="card">${entries.length?ganttChart(entries,{label:(p,sid)=>esc(p.orderNo||'—')+' · '+esc(supplierName(sid)),color:(p,sid)=>supplierColor(sid),labelWidth:190,sort:(a,b)=>{const an=supplierName(a.en.sid),bn=supplierName(b.en.sid);return an.localeCompare(bn)||a.s-b.s},legend:legend}):'<div class="empty"><div class="empty-ico">📆</div>No allocated orders to schedule yet. Allocate orders to suppliers first.</div>'}</div>`;
 }
 function supplierCard(s,wk){
   const orders=supplierOrders(s.id);
@@ -920,7 +933,7 @@ function supplierCard(s,wk){
     <div style="flex:1;min-width:150px"><div style="color:var(--muted);font-size:11.5px;margin-bottom:4px">Avg progress this week — <strong>${wkAvg}%</strong></div><div class="pbar"><span style="width:${wkAvg}%"></span></div></div>
   </div>
   ${active.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">📈 Weekly progress trend — avg % (last 6 weeks)</div>${supplierTrendBars(s)}</div>`:''}
-  ${active.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">🗓 Order timeline — start → finish (overlapping bars = concurrent load)</div>${supplierGantt(active)}</div>`:''}
+  ${orders.length?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">🗓 Order timeline — start → finish (overlapping bars = concurrent load)</div>${supplierGantt(orders)}</div>`:''}
   ${active.length?`<div class="tbl-wrap"><table><thead><tr><th>Order #</th><th>Buyer</th><th>Product</th><th>Alloc Qty</th><th>Stage</th><th>Overall</th><th>This week %</th><th>Deadline</th></tr></thead><tbody>
     ${active.map(p=>{const d=daysUntil(p.exf);const w=getWeek(p,s.id,wk);const wp=w&&w.progress!=null?w.progress:'';const shared=(p.allocations||[]).length>1;
       return `<tr><td style="cursor:pointer" onclick="openOrder('${p.id}')"><strong>${esc(p.orderNo||'—')}</strong>${shared?' <span class="tag" title="Shared across: '+esc((p.allocations||[]).map(a=>supplierName(a.supplierId)).join(', '))+'">🔀 split</span>':''}</td><td>${esc(p.party||'')}</td><td>${esc(p.product||'')}</td>
