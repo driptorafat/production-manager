@@ -229,8 +229,8 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
     <div class="login-title">Production Manager</div>
     <div class="login-sub">Track manufacturing from order to shipment</div>
     <div id="login-error"></div>
-    <div class="fg"><label>Username</label><input id="l-user" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="fg"><label>Password</label><input id="l-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Username</label><input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Password</label><input id="l-pass" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-pri" style="width:100%;justify-content:center" onclick="doLogin()">Sign In</button>
     <div class="login-hint">Default login — <strong>admin</strong> / <strong>admin123</strong><br>Change it in Settings after first login.</div>
   </div>
@@ -381,10 +381,11 @@ function saveAll(){
 function loadAuth(){const s=localStorage.getItem('pm_auth');if(s){try{return JSON.parse(s)}catch(e){}}return{...DEFAULT_AUTH}}
 function saveAuth(o){localStorage.setItem('pm_auth',JSON.stringify(o))}
 function doLogin(){
-  const u=$('l-user').value.trim(),p=$('l-pass').value,err=$('login-error');
+  const u=$('l-user').value.trim(),p=$('l-pass').value.trim(),err=$('login-error');
   if(!u||!p){err.textContent='Please enter both fields.';err.style.display='block';return}
   const a=loadAuth();
-  if(u===a.username&&p===(a.password||DEFAULT_AUTH.password)){
+  // Username is case-insensitive (phones often auto-capitalise it); password is trimmed.
+  if(u.toLowerCase()===String(a.username||'').toLowerCase()&&p===String(a.password||DEFAULT_AUTH.password).trim()){
     sessionStorage.setItem('pm_session','ok');sessionStorage.setItem('pm_user',u);
     $('login-screen').classList.add('hidden');err.style.display='none';
     $('l-pass').value='';$('l-user').value='';$('topbar-user').textContent='👤 '+u;
@@ -1359,7 +1360,7 @@ function tnaTemplateEditorHTML(){const t=(PD.config&&PD.config.tnaTemplate)||[];
   t.map((m,i)=>`<div style="display:grid;${G};gap:6px;margin-bottom:6px"><input value="${esc(m.label)}" onchange="PD.config.tnaTemplate[${i}].label=this.value;saveAll()"><input type="number" value="${esc(m.offset)}" onchange="PD.config.tnaTemplate[${i}].offset=+this.value||0;saveAll()"><button class="del-x" onclick="PD.config.tnaTemplate.splice(${i},1);saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML()">×</button></div>`).join('');}
 function addTnaTpl(){PD.config.tnaTemplate.push({label:'New step',offset:0});saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML()}
 function resetTnaTpl(){PD.config.tnaTemplate=defaultConfig().tnaTemplate;saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML();toast('TNA template reset')}
-function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value;const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';toast('🔑 Credentials updated')}
+function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value.trim();const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';toast('🔑 Credentials updated')}
 function exportJSON(){const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(PD,null,2));a.download='production_backup.json';a.click();toast('⬇ Backup saved')}
 function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.years)throw 0;PD=Object.assign(defaultData(),d);saveAll();render();toast('✅ Data restored')}catch(x){toast('Invalid backup file')}};r.readAsText(f);inp.value=''}
 function resetYear(){confirm2('Clear '+curYear()+' orders?','Removes all production orders for '+curYear()+'. Backup first if unsure.',()=>{PD.years[curYear()]={prods:[]};saveAll();render();toast('Cleared')})}
