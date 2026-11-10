@@ -232,6 +232,7 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
     <div class="fg"><label>Username</label><input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fg"><label>Password</label><input id="l-pass" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-pri" style="width:100%;justify-content:center" onclick="doLogin()">Sign In</button>
+    <div id="login-sync" class="login-hint" style="display:none;color:var(--pri)"></div>
     <div class="login-hint">Default login — <strong>admin</strong> / <strong>admin123</strong><br>Change it in Settings after first login.</div>
   </div>
 </div>
@@ -1360,7 +1361,8 @@ function tnaTemplateEditorHTML(){const t=(PD.config&&PD.config.tnaTemplate)||[];
   t.map((m,i)=>`<div style="display:grid;${G};gap:6px;margin-bottom:6px"><input value="${esc(m.label)}" onchange="PD.config.tnaTemplate[${i}].label=this.value;saveAll()"><input type="number" value="${esc(m.offset)}" onchange="PD.config.tnaTemplate[${i}].offset=+this.value||0;saveAll()"><button class="del-x" onclick="PD.config.tnaTemplate.splice(${i},1);saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML()">×</button></div>`).join('');}
 function addTnaTpl(){PD.config.tnaTemplate.push({label:'New step',offset:0});saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML()}
 function resetTnaTpl(){PD.config.tnaTemplate=defaultConfig().tnaTemplate;saveAll();$('tna-tpl').innerHTML=tnaTemplateEditorHTML();toast('TNA template reset')}
-function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value.trim();const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';toast('🔑 Credentials updated')}
+function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value.trim();const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';
+  const c=PD.cloud||{};if(c.token&&c.gistId){doPushProduction(true);toast('🔑 Credentials updated & synced to your Gist');}else{toast('🔑 Credentials updated (link your Gist in Cloud Sync to sync them across devices)');}}
 function exportJSON(){const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(PD,null,2));a.download='production_backup.json';a.click();toast('⬇ Backup saved')}
 function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.years)throw 0;PD=Object.assign(defaultData(),d);saveAll();render();toast('✅ Data restored')}catch(x){toast('Invalid backup file')}};r.readAsText(f);inp.value=''}
 function resetYear(){confirm2('Clear '+curYear()+' orders?','Removes all production orders for '+curYear()+'. Backup first if unsure.',()=>{PD.years[curYear()]={prods:[]};saveAll();render();toast('Cleared')})}
@@ -1677,7 +1679,7 @@ async function doPullOrders(){
 async function doPushProduction(silent){
   const c=PD.cloud||{};if(!c.token){if(!silent)toast('Add a GitHub token in Settings');return}
   if(!silent)setSync('warn','Pushing…');
-  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages,suppliers:PD.suppliers,company:PD.company,config:PD.config,rateBook:PD.rateBook});
+  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages,suppliers:PD.suppliers,company:PD.company,config:PD.config,rateBook:PD.rateBook,auth:loadAuth()});
     if(!c.gistId){const res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':'Bearer '+c.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'},body:JSON.stringify({description:'Production Manager Data',public:false,files:{[GIST_PROD_FILE]:{content:data}}})});
       if(!res.ok)throw new Error('Create failed: '+res.status);const g=await res.json();PD.cloud.gistId=g.id;saveAll();
       if(!silent)toast('☁ New Gist created: '+g.id+' — paste this same ID into Export Manager to link them');}
@@ -1688,7 +1690,7 @@ async function doPushProduction(silent){
 async function doPullProduction(){
   setSync('warn','Pulling…');
   try{const g=await gistGet();const f=g.files&&g.files[GIST_PROD_FILE];if(!f)throw new Error('No '+GIST_PROD_FILE+' yet — push first');
-    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;if(d.suppliers)PD.suppliers=d.suppliers;if(d.company)PD.company=d.company;if(d.config)PD.config=d.config;if(d.rateBook)PD.rateBook=d.rateBook;
+    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;if(d.suppliers)PD.suppliers=d.suppliers;if(d.company)PD.company=d.company;if(d.config)PD.config=d.config;if(d.rateBook)PD.rateBook=d.rateBook;if(d.auth&&d.auth.username)saveAuth(d.auth);
     saveAll();render();setSync('ok','Pulled '+new Date().toLocaleTimeString());toast('☁ Production data pulled');
   }catch(e){setSync('err','Pull error');toast('Pull error: '+e.message)}
 }
@@ -1728,10 +1730,17 @@ function setupPWA(){try{
   let l=document.querySelector('link[rel="manifest"]');if(!l){l=document.createElement('link');l.rel='manifest';document.head.appendChild(l);}l.href=url;
   let a=document.querySelector('link[rel="apple-touch-icon"]');if(!a){a=document.createElement('link');a.rel='apple-touch-icon';document.head.appendChild(a);}a.href=pwaIcon(180);
 }catch(e){}}
+// Before login on an already-linked browser, pull the latest synced credentials
+// from the Gist so a password changed on another device works right away.
+async function preLoginSync(){try{await loadData();const c=PD.cloud||{};if(!c.token||!c.gistId)return;
+  const hint=$('login-sync');if(hint){hint.textContent='🔄 Checking cloud login…';hint.style.display='block';}
+  const g=await gistGet();const f=g.files&&g.files[GIST_PROD_FILE];if(f){const d=JSON.parse(f.content);if(d.auth&&d.auth.username)saveAuth(d.auth);}
+  if(hint)hint.style.display='none';
+}catch(e){const hint=$('login-sync');if(hint)hint.style.display='none';}}
 (function init(){const t=localStorage.getItem('pm_theme')||'light';$('root-html').setAttribute('data-theme',t);
   setupPWA();setupLangObserver();updateLangBtn();applyLang();
   if(sessionStorage.getItem('pm_session')==='ok'){$('login-screen').classList.add('hidden');$('topbar-user').textContent='👤 '+(sessionStorage.getItem('pm_user')||'admin');bootApp();}
-  else{$('login-screen').classList.remove('hidden');setTimeout(()=>$('l-user').focus(),100)}
+  else{$('login-screen').classList.remove('hidden');setTimeout(()=>$('l-user').focus(),100);preLoginSync();}
 })();
 </script>
 </body>
