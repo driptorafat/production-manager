@@ -178,6 +178,13 @@ tbody tr:hover{background:var(--card2)}
 .chk-row,.mat-row{display:flex;gap:8px;align-items:center;margin-bottom:7px}
 .chk-row input[type=checkbox]{width:17px;height:17px;flex-shrink:0}
 .del-x{background:var(--errl);color:var(--err);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:15px;flex-shrink:0}
+.wo-irow{display:grid;grid-template-columns:78px 1fr 110px 62px 62px 70px 40px 30px;gap:6px;align-items:center;margin-bottom:6px}
+.wo-irow input{padding:6px 7px;font-size:12px}
+.wo-ihead{font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+.wo-irow .wo-amt{font-size:11.5px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wo-img img{width:30px;height:30px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr);cursor:pointer;display:block}
+.wo-imgbtn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1.5px dashed var(--bdr);border-radius:6px;cursor:pointer;color:var(--muted);font-size:15px}
+@media(max-width:700px){.wo-irow{grid-template-columns:1fr 1fr;gap:5px}.wo-ihead{display:none}.wo-irow .wo-amt{text-align:left}}
 
 .empty{text-align:center;padding:46px 20px;color:var(--muted);background:var(--card);border:1.5px dashed var(--bdr);border-radius:13px}
 .empty-ico{font-size:40px;margin-bottom:8px}
@@ -299,8 +306,22 @@ function _openIDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open('p
 function _idbGet(k){return new Promise((res,rej)=>{const t=_idb.transaction('kv','readonly').objectStore('kv').get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error)})}
 function _idbSet(k,v){return new Promise((res,rej)=>{const t=_idb.transaction('kv','readwrite').objectStore('kv').put(v,k);t.onsuccess=()=>res();t.onerror=()=>rej(t.error)})}
 
+function defaultCompany(){return{
+  name:'হ্যান্ড টাচ',
+  address:'বাড়ি- ৫৬০, রোড- ০৮, বাইতুল আমান হাউজিং সোসাইটি, আদাবর, ঢাকা- ১২০৭',
+  refPrefix:'HT-',
+  terms:[
+    '১। ডেলিভারি পয়েন্টঃ হ্যান্ড টাচের স্টোরে পণ্য সরবরাহ করতে হবে, ফোর্ডনগর, সিংগাইর, মানিকগঞ্জ।',
+    '২. পেমেন্ট শর্তঃ পণ্য সরবারহের পূর্বে ৩০% পেমেন্ট এবং বাকি ৭০%  সম্পূর্ণ পণ্য সরবারহের পরে ২০ থেকে ৩০ দিনের মধ্যে পরিশোধ করা হবে।',
+    '৩. চূড়ান্ত উৎপাদন শুরু করার আগে অনুগ্রহ করে নমুনা অনুমোদন করে নিতে হবে।',
+    '৪. সঠিক পরিমাণের সাথে নির্ধারিত তারিখে পণ্য সরবারহ করতে হবে।',
+    '৫.পলিথিন ছাড়া অন্যান্য কাঁচামাল আপনার নিজের দায়িত্বে সংগ্রহ করতে হবে। ',
+    '৬. উৎপাদনে পণ্যের গুনগত মান নিশ্চিত করতে হবে।গুনগত মান খারাপ এমন পণ্য গ্রহন করা হবে না এবং প্রয়োজনে জরিমানা দিতে হবে।',
+    '৭. আংশিক ডেলিভারি গ্রহণযোগ্য।'
+  ],
+  signatories:['Received By','Production In-charge','G.M  (H.T)','CEO (H.T)']}}
 function defaultData(){const y=String(new Date().getFullYear());return{currentYear:y,years:{[y]:{prods:[]}},
-  cloud:{token:'',gistId:'',autoSync:false},stages:[...DEFAULT_STAGES],suppliers:[]}}
+  cloud:{token:'',gistId:'',autoSync:false},stages:[...DEFAULT_STAGES],suppliers:[],company:defaultCompany()}}
 
 async function loadData(){
   let d=null;
@@ -312,6 +333,10 @@ async function loadData(){
   if(!PD.cloud)PD.cloud={token:'',gistId:'',autoSync:false};
   if(!PD.stages||!PD.stages.length)PD.stages=[...DEFAULT_STAGES];
   if(!PD.suppliers)PD.suppliers=[];
+  if(!PD.company)PD.company=defaultCompany();
+  else{const dc=defaultCompany();['name','address','refPrefix'].forEach(k=>{if(PD.company[k]==null)PD.company[k]=dc[k]});
+    if(!Array.isArray(PD.company.terms)||!PD.company.terms.length)PD.company.terms=dc.terms;
+    if(!Array.isArray(PD.company.signatories)||!PD.company.signatories.length)PD.company.signatories=dc.signatories;}
   migrateAllocations();
 }
 let _saveT=null;
@@ -518,7 +543,7 @@ function paintOrders(){
       <td><div class="pbar"><span style="width:${stageProgress(p.stage)}%"></span></div><span style="font-size:10.5px;color:var(--muted)">${stageProgress(p.stage)}%</span></td>
       <td>${fmtDate(p.exf)} ${done?'<span class="badge b-ok">✓ '+(isShippedStage(p.stage)?'shipped':'paid')+'</span>':dcls?`<span class="badge ${dcls}">${dtxt}</span>`:''}</td>
       <td><span class="badge pri-${p.priority||'Normal'}">${p.priority||'Normal'}</span></td>
-      <td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openOrder('${p.id}')">✏️</button></td></tr>`}).join('')}
+      <td onclick="event.stopPropagation()" style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="rowPrintWO('${p.id}')" title="Supplier Work Order (PO)">🖨</button><button class="btn btn-ghost btn-sm" onclick="openOrder('${p.id}')">✏️</button></td></tr>`}).join('')}
     </tbody></table></div>`;
 }
 
@@ -538,6 +563,7 @@ function openOrder(id){
   draftPhotos=(p.photos||[]).slice();
   draftAllocations=JSON.parse(JSON.stringify(p.allocations||[]));
   draftWeekly=JSON.parse(JSON.stringify(p.weekly||{}));
+  draftWO=p.wo?JSON.parse(JSON.stringify(p.wo)):seedWO(p);
   $('ord-title').textContent=id?('Order '+(p.orderNo||'')):'New Production Order';
   $('ord-body').innerHTML=orderForm(p);
   openModal('ord-ov');
@@ -571,6 +597,10 @@ function orderForm(p){
 <label>Supplier Allocation — split this order across one or more factories</label>
 <div id="of-alloc">${allocHTML()}</div>
 <button class="btn btn-ghost btn-sm" onclick="addAlloc()" style="margin-top:4px">+ Add supplier</button>
+
+<hr class="div">
+<label>📄 Supplier Work Order (PO) — printable in your Bengali format</label>
+<div id="of-wo">${woEditorHTML()}</div>
 
 <hr class="div">
 <label>This Week's Progress — ${weekRangeLabel(mondayOf(new Date()))} (per supplier)</label>
@@ -639,7 +669,7 @@ function collectForm(){
     allocations:draftAllocations.filter(a=>a.supplierId),weekly:draftWeekly,
     qc:{status:$('of-qc').value,notes:(findProd($('of-id').value)||{}).qc?.notes||''},
     checklist:draftChecklist,materials:draftMaterials,photos:draftPhotos,notes:$('of-notes').value,
-    cancelled:$('of-cancel').checked};
+    wo:draftWO,cancelled:$('of-cancel').checked};
 }
 function saveOrder(){
   const f=collectForm();
@@ -654,6 +684,161 @@ function saveOrder(){
 }
 function deleteOrder(){const id=$('of-id').value;confirm2('Delete order?','This permanently removes the production order. This cannot be undone.',()=>{
   const list=getProds(curYear()).filter(p=>p.id!==id);setProds(curYear(),list);closeModal('ord-ov');render();toast('Deleted')})}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SUPPLIER WORK ORDER (printable PO — Bengali format)
+// ════════════════════════════════════════════════════════════════════════════
+const BN_DIGITS=['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+const BN_MONTHS=['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+// 0-99 Bengali number words (irregular — needed for the "in words" amount)
+const BN_WORDS=['শূন্য','এক','দুই','তিন','চার','পাঁচ','ছয়','সাত','আট','নয়','দশ','এগারো','বারো','তেরো','চৌদ্দ','পনেরো','ষোলো','সতেরো','আঠারো','ঊনিশ','বিশ','একুশ','বাইশ','তেইশ','চব্বিশ','পঁচিশ','ছাব্বিশ','সাতাশ','আটাশ','ঊনত্রিশ','ত্রিশ','একত্রিশ','বত্রিশ','তেত্রিশ','চৌত্রিশ','পঁয়ত্রিশ','ছত্রিশ','সাঁইত্রিশ','আটত্রিশ','ঊনচল্লিশ','চল্লিশ','একচল্লিশ','বিয়াল্লিশ','তেতাল্লিশ','চুয়াল্লিশ','পঁয়তাল্লিশ','ছেচল্লিশ','সাতচল্লিশ','আটচল্লিশ','ঊনপঞ্চাশ','পঞ্চাশ','একান্ন','বায়ান্ন','তিপ্পান্ন','চুয়ান্ন','পঞ্চান্ন','ছাপ্পান্ন','সাতান্ন','আটান্ন','ঊনষাট','ষাট','একষট্টি','বাষট্টি','তেষট্টি','চৌষট্টি','পঁয়ষট্টি','ছিষট্টি','সাতষট্টি','আটষট্টি','ঊনসত্তর','সত্তর','একাত্তর','বাহাত্তর','তিয়াত্তর','চুয়াত্তর','পঁচাত্তর','ছিয়াত্তর','সাতাত্তর','আটাত্তর','ঊনআশি','আশি','একাশি','বিরাশি','তিরাশি','চুরাশি','পঁচাশি','ছিয়াশি','সাতাশি','আটাশি','ঊননব্বই','নব্বই','একানব্বই','বিরানব্বই','তিরানব্বই','চুরানব্বই','পঁচানব্বই','ছিয়ানব্বই','সাতানব্বই','আটানব্বই','নিরানব্বই'];
+function toBn(s){return String(s==null?'':s).replace(/[0-9]/g,d=>BN_DIGITS[+d]);}
+function bnNum(n){return toBn((+n||0).toString());}
+function bnDate(iso){if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return '';const d=new Date(iso+'T00:00:00');if(isNaN(d))return '';
+  return toBn(String(d.getDate()).padStart(2,'0'))+' '+BN_MONTHS[d.getMonth()]+', '+toBn(d.getFullYear());}
+// Bengali amount-in-words using the Indian system (কোটি / লাখ / হাজার / শ)
+function bnWords(num){num=Math.floor(Math.abs(+num||0));if(num===0)return BN_WORDS[0];
+  const cr=Math.floor(num/10000000);num%=10000000;const la=Math.floor(num/100000);num%=100000;
+  const th=Math.floor(num/1000);num%=1000;const hu=Math.floor(num/100);const rest=num%100;
+  const out=[];
+  if(cr)out.push(bnWords(cr)+' কোটি');
+  if(la)out.push(BN_WORDS[la]+' লাখ');
+  if(th)out.push(BN_WORDS[th]+' হাজার');
+  if(hu)out.push(BN_WORDS[hu]+'শ');
+  if(rest)out.push(BN_WORDS[rest]);
+  return out.join(' ');}
+
+// Draft state for the Work Order editor (lives alongside the order form)
+let draftWO=null;
+function blankWO(){return{supplierId:'',issueDate:todayISO(),refNo:'',orderLabel:'',deliveryDate:'',items:[]}}
+function blankWOItem(){return{code:'',desc:'',size:'',qty:'',rate:'',img:''}}
+// Seed a sensible WO from the order when none exists yet
+function seedWO(p){const w=blankWO();
+  w.supplierId=(p.allocations&&p.allocations[0]&&p.allocations[0].supplierId)||'';
+  w.deliveryDate=/^\d{4}-\d{2}-\d{2}$/.test(p.exf)?p.exf:'';
+  const yy=(curYear()||'').slice(-2);
+  w.refNo=(PD.company&&PD.company.refPrefix||'HT-')+(p.orderNo||'')+(yy?'/'+yy:'');
+  const q=(p.allocations&&p.allocations[0]&&p.allocations[0].qty)||p.qty||'';
+  w.items=[Object.assign(blankWOItem(),{desc:p.product||'',qty:q})];
+  return w;}
+
+function woEditorHTML(){const w=draftWO||blankWO();const sups=getSuppliers();
+  const itemsHead=`<div class="wo-irow wo-ihead"><span>Code</span><span>Description</span><span>Size</span><span>Qty</span><span>Rate ৳</span><span>Amount ৳</span><span>Img</span><span></span></div>`;
+  const itemsBody=(w.items||[]).length?(w.items||[]).map((it,i)=>{const amt=(+it.qty||0)*(+it.rate||0);
+    return `<div class="wo-irow">
+      <input value="${esc(it.code)}" placeholder="ND040801" oninput="draftWO.items[${i}].code=this.value">
+      <input value="${esc(it.desc)}" placeholder="বিবরন / description" oninput="draftWO.items[${i}].desc=this.value">
+      <input value="${esc(it.size)}" placeholder="সাইজ / size" oninput="draftWO.items[${i}].size=this.value">
+      <input type="number" value="${esc(it.qty)}" placeholder="0" oninput="draftWO.items[${i}].qty=this.value;woRecalc()">
+      <input type="number" step="0.001" value="${esc(it.rate)}" placeholder="0" oninput="draftWO.items[${i}].rate=this.value;woRecalc()">
+      <span class="wo-amt" id="wo-amt-${i}">${amt?amt.toLocaleString():'—'}</span>
+      <span class="wo-img">${it.img?`<img src="${it.img}" onclick="setWOItemImg(${i},'')" title="Click to remove">`:`<label class="wo-imgbtn">+<input type="file" accept="image/*" style="display:none" onchange="addWOItemImg(${i},this)"></label>`}</span>
+      <button class="del-x" onclick="draftWO.items.splice(${i},1);refreshWO()">×</button></div>`;}).join(''):'<div style="font-size:12px;color:var(--muted);margin:4px 0">No line items yet — click "+ Add item".</div>';
+  const total=(w.items||[]).reduce((s,it)=>s+(+it.qty||0)*(+it.rate||0),0);
+  return `
+<div class="fg-grid">
+  <div class="fg"><label>Work Order for supplier</label>
+    <select onchange="draftWO.supplierId=this.value">${sups.length?'<option value="">— select supplier —</option>':'<option value="">No suppliers — add one first</option>'}${sups.map(s=>`<option value="${s.id}" ${w.supplierId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+  <div class="fg"><label>Order No (as printed, e.g. ০৪/২৬)</label><input value="${esc(w.orderLabel)}" placeholder="০৪/২৬" oninput="draftWO.orderLabel=this.value"></div>
+  <div class="fg"><label>Ref. Number</label><input value="${esc(w.refNo)}" placeholder="HT-260904/26" oninput="draftWO.refNo=this.value"></div>
+  <div class="fg"><label>Issue Date</label><input type="date" value="${esc(w.issueDate)}" oninput="draftWO.issueDate=this.value"></div>
+  <div class="fg"><label>Delivery Date</label><input type="date" value="${esc(w.deliveryDate)}" oninput="draftWO.deliveryDate=this.value"></div>
+</div>
+<div style="margin-top:10px">${itemsHead}<div id="wo-items">${itemsBody}</div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
+  <button class="btn btn-ghost btn-sm" onclick="draftWO.items.push(blankWOItem());refreshWO()">+ Add item</button>
+  <div style="font-size:13px;font-weight:700">মোট / Total: <span id="wo-total">৳${total.toLocaleString()}</span></div>
+</div>
+<div style="font-size:11.5px;color:var(--muted);margin-top:4px">কথায়ঃ <span id="wo-words">${total?bnWords(total)+' মাত্র':'—'}</span></div>
+<button class="btn btn-pri btn-sm" style="margin-top:10px" onclick="printWorkOrder()">🖨 Preview / Print Work Order</button>`;}
+function refreshWO(){const el=$('of-wo');if(el)el.innerHTML=woEditorHTML();}
+function woRecalc(){const w=draftWO||blankWO();let total=0;
+  (w.items||[]).forEach((it,i)=>{const amt=(+it.qty||0)*(+it.rate||0);total+=amt;const c=$('wo-amt-'+i);if(c)c.textContent=amt?amt.toLocaleString():'—';});
+  const t=$('wo-total');if(t)t.textContent='৳'+total.toLocaleString();
+  const ww=$('wo-words');if(ww)ww.textContent=total?bnWords(total)+' মাত্র':'—';}
+function addWOItemImg(i,inp){const f=inp.files&&inp.files[0];if(!f)return;compressImg(f,d=>{draftWO.items[i].img=d;refreshWO()});inp.value='';}
+function setWOItemImg(i,v){draftWO.items[i].img=v;refreshWO();}
+
+// Quick-print from the orders table: use the saved WO if set up, otherwise open the editor
+function rowPrintWO(id){const p=findProd(id);if(!p)return;
+  if(p.wo&&(p.wo.items||[]).some(it=>it.desc||it.code||it.qty)){draftWO=JSON.parse(JSON.stringify(p.wo));printWorkOrder();}
+  else{openOrder(id);toast('Fill in the Work Order section, then click Print');}}
+function printWorkOrder(){const w=draftWO||blankWO();const co=PD.company||defaultCompany();
+  const sup=findSupplier(w.supplierId);
+  if(!(w.items||[]).some(it=>it.desc||it.code||it.qty)){toast('Add at least one line item first');return;}
+  const total=(w.items||[]).reduce((s,it)=>s+(+it.qty||0)*(+it.rate||0),0);
+  const rows=(w.items||[]).map((it,i)=>{const amt=(+it.qty||0)*(+it.rate||0);
+    return `<tr>
+      <td class="c-sl">${toBn(i+1)}</td>
+      <td class="c-code">${esc(it.code||'')}</td>
+      <td class="c-img">${it.img?`<img src="${it.img}">`:''}</td>
+      <td class="c-desc">${esc(it.desc||'')}</td>
+      <td class="c-size">${esc(it.size||'')}</td>
+      <td class="c-num">${it.qty!==''&&it.qty!=null?bnNum(it.qty):''}</td>
+      <td class="c-num">${it.rate!==''&&it.rate!=null?toBn((+it.rate||0).toString()):''}</td>
+      <td class="c-num">${amt?bnNum(amt):''}</td></tr>`;}).join('');
+  const sigs=(co.signatories||[]).map(s=>`<div class="sig"><div class="sig-line"></div><div class="sig-lbl">${esc(s)}</div></div>`).join('');
+  const terms=(co.terms||[]).map(t=>`<div class="term">${esc(t)}</div>`).join('');
+  const html=`<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"><title>Work Order ${esc(w.orderLabel||w.refNo||'')}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans Bengali','Nirmala UI','Kohinoor Bangla','Bangla MN','SolaimanLipi',Arial,sans-serif;color:#000;padding:26px 30px;font-size:13px;line-height:1.45}
+  .wo{max-width:760px;margin:0 auto}
+  .co-name{text-align:center;font-size:26px;font-weight:800;letter-spacing:.5px}
+  .co-addr{text-align:center;font-size:12.5px;margin-top:2px;padding-bottom:8px;border-bottom:2px solid #000}
+  .meta{display:flex;justify-content:space-between;gap:20px;margin-top:12px}
+  .meta .to{font-size:13px}.meta .to .nm{font-weight:700;font-size:14px}
+  .meta .rt{font-size:12.5px;text-align:left;white-space:nowrap}
+  .meta .rt div{margin-bottom:3px}
+  .ordno{font-weight:700;margin-top:8px;font-size:13.5px}
+  table{border-collapse:collapse;width:100%;margin-top:8px}
+  th,td{border:1px solid #000;padding:4px 6px;vertical-align:middle}
+  th{background:#eee;font-size:12px;text-align:center;font-weight:700}
+  td.c-sl{text-align:center;width:34px}
+  td.c-code{text-align:center;width:78px;font-size:12px}
+  td.c-img{width:70px;text-align:center;padding:2px}
+  td.c-img img{max-width:64px;max-height:64px;object-fit:contain}
+  td.c-desc{font-size:12px}
+  td.c-size{font-size:11.5px;width:140px}
+  td.c-num{text-align:right;white-space:nowrap;width:56px}
+  tr.total td{font-weight:800;font-size:13px}
+  .total-lbl{text-align:center}
+  .words{margin-top:7px;font-size:13px;font-weight:600}
+  .terms-h{margin-top:14px;font-weight:700;text-decoration:underline}
+  .term{font-size:12px;margin-top:3px;line-height:1.5}
+  .sigs{display:flex;justify-content:space-between;gap:16px;margin-top:54px}
+  .sig{flex:1;text-align:center}
+  .sig-line{border-top:1px solid #000;margin:0 6px}
+  .sig-lbl{font-size:12px;margin-top:4px;font-weight:600}
+  @media print{body{padding:10mm 12mm}@page{size:A4;margin:0}}
+</style></head><body><div class="wo">
+  <div class="co-name">${esc(co.name||'')}</div>
+  <div class="co-addr">${esc(co.address||'')}</div>
+  <div class="meta">
+    <div class="to">প্রতি,<br><span class="nm">${esc(sup?sup.name:'—')}</span>${sup&&sup.contact?'<br>C/O: '+esc(sup.contact):''}${sup&&sup.location?'<br>'+esc(sup.location):''}${sup&&sup.phone?'<br>'+esc(sup.phone):''}</div>
+    <div class="rt">
+      <div>ইস্যু ডেট: ${bnDate(w.issueDate)||'—'}</div>
+      <div>Ref. Number: ${esc(w.refNo||'')}</div>
+      <div>ডেলিভেরি ডেটঃ ${bnDate(w.deliveryDate)||'—'}</div>
+    </div>
+  </div>
+  ${w.orderLabel?`<div class="ordno">অর্ডার নং ${esc(w.orderLabel)}</div>`:''}
+  <table>
+    <thead><tr><th>সি নং</th><th>কোড নং</th><th>ছবি</th><th>বিবরন</th><th>সাইজ</th><th>পরিমান/ পিস</th><th>দাম (টাকা)</th><th>মোট</th></tr></thead>
+    <tbody>${rows}
+      <tr class="total"><td class="total-lbl" colspan="7">মোট</td><td class="c-num">${bnNum(total)}</td></tr>
+    </tbody>
+  </table>
+  <div class="words">কথায়ঃ ${total?bnWords(total)+' মাত্র':'—'}</div>
+  ${terms?`<div class="terms-h">শর্তাবলীঃ</div>${terms}`:''}
+  <div class="sigs">${sigs}</div>
+</div>
+<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script>
+</body></html>`;
+  const win=window.open('','_blank');if(!win){toast('Allow pop-ups to print the Work Order');return;}
+  win.document.write(html);win.document.close();}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  DEADLINES / CALENDAR
@@ -710,7 +895,7 @@ function exportCSV(){const list=getProds(curYear());if(!list.length){toast('Noth
 //  SETTINGS
 // ════════════════════════════════════════════════════════════════════════════
 function renderSettings(){
-  const c=PD.cloud||{};const stg=stages();
+  const c=PD.cloud||{};const stg=stages();const co=PD.company||defaultCompany();
   return `<div class="sh"><div><div class="sh-t">Settings</div></div></div>
 <div class="g2">
   <div class="card"><div class="card-title">☁ Cloud Sync & Export Manager Link</div>
@@ -736,6 +921,18 @@ function renderSettings(){
     <div id="stage-editor">${stagesEditorHTML()}</div>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="addStage()">+ Add stage</button><button class="btn btn-ghost btn-sm" onclick="resetStages()">↺ Reset default</button></div>
   </div>
+</div>
+
+<div class="card" style="margin-top:16px"><div class="card-title">🏢 Company Profile — Work Order (PO) header</div>
+  <div class="note">These appear on every supplier Work Order you print. Defaults match your Hand Touch format. Supplier name, address &amp; contact come from the <strong>Suppliers</strong> tab.</div>
+  <div class="fg-grid">
+    <div class="fg full"><label>Company Name (as printed)</label><input id="co-name" value="${esc(co.name||'')}" placeholder="হ্যান্ড টাচ"></div>
+    <div class="fg full"><label>Company Address</label><input id="co-addr" value="${esc(co.address||'')}"></div>
+    <div class="fg"><label>Ref. Number prefix</label><input id="co-ref" value="${esc(co.refPrefix||'')}" placeholder="HT-"></div>
+  </div>
+  <div class="fg"><label>Terms &amp; Conditions (শর্তাবলী) — one per line</label><textarea id="co-terms" rows="7" style="font-size:12px">${esc((co.terms||[]).join('\n'))}</textarea></div>
+  <div class="fg"><label>Signatory labels — one per line (printed left → right)</label><textarea id="co-sigs" rows="4" style="font-size:12px">${esc((co.signatories||[]).join('\n'))}</textarea></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-pri btn-sm" onclick="saveCompany()">💾 Save Company Profile</button><button class="btn btn-ghost btn-sm" onclick="resetCompany()">↺ Reset to Hand Touch defaults</button></div>
 </div>
 
 <div class="g2" style="margin-top:16px">
@@ -765,6 +962,12 @@ function addStage(){PD.stages.splice(PD.stages.length-1,0,'New Stage');saveAll()
 function removeStage(i){if(PD.stages.length<=2)return;PD.stages.splice(i,1);saveAll();$('stage-editor').innerHTML=stagesEditorHTML()}
 function resetStages(){PD.stages=[...DEFAULT_STAGES];saveAll();$('stage-editor').innerHTML=stagesEditorHTML();toast('Stages reset')}
 function saveCloud(){PD.cloud={token:$('s-token').value.trim(),gistId:$('s-gist').value.trim(),autoSync:$('s-auto').checked};saveAll();toast('☁ Cloud config saved')}
+function saveCompany(){const co=PD.company||defaultCompany();
+  co.name=$('co-name').value.trim();co.address=$('co-addr').value.trim();co.refPrefix=$('co-ref').value.trim();
+  co.terms=$('co-terms').value.split('\n').map(s=>s.replace(/\s+$/,'')).filter(s=>s.trim());
+  co.signatories=$('co-sigs').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  PD.company=co;saveAll();toast('🏢 Company profile saved')}
+function resetCompany(){confirm2('Reset company profile?','Restores the default Hand Touch name, address, terms and signatories used on Work Orders.',()=>{PD.company=defaultCompany();saveAll();render();toast('Company profile reset')})}
 function saveCreds(){const u=$('s-user').value.trim();const p=$('s-pass').value;const a=loadAuth();if(u)a.username=u;if(p)a.password=p;saveAuth(a);sessionStorage.setItem('pm_user',a.username);$('topbar-user').textContent='👤 '+a.username;$('s-pass').value='';toast('🔑 Credentials updated')}
 function exportJSON(){const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(PD,null,2));a.download='production_backup.json';a.click();toast('⬇ Backup saved')}
 function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.years)throw 0;PD=Object.assign(defaultData(),d);saveAll();render();toast('✅ Data restored')}catch(x){toast('Invalid backup file')}};r.readAsText(f);inp.value=''}
@@ -1072,7 +1275,7 @@ async function doPullOrders(){
 async function doPushProduction(silent){
   const c=PD.cloud||{};if(!c.token){if(!silent)toast('Add a GitHub token in Settings');return}
   if(!silent)setSync('warn','Pushing…');
-  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages,suppliers:PD.suppliers});
+  try{const data=JSON.stringify({currentYear:PD.currentYear,years:PD.years,stages:PD.stages,suppliers:PD.suppliers,company:PD.company});
     if(!c.gistId){const res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':'Bearer '+c.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'},body:JSON.stringify({description:'Production Manager Data',public:false,files:{[GIST_PROD_FILE]:{content:data}}})});
       if(!res.ok)throw new Error('Create failed: '+res.status);const g=await res.json();PD.cloud.gistId=g.id;saveAll();
       if(!silent)toast('☁ New Gist created: '+g.id+' — paste this same ID into Export Manager to link them');}
@@ -1083,7 +1286,7 @@ async function doPushProduction(silent){
 async function doPullProduction(){
   setSync('warn','Pulling…');
   try{const g=await gistGet();const f=g.files&&g.files[GIST_PROD_FILE];if(!f)throw new Error('No '+GIST_PROD_FILE+' yet — push first');
-    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;if(d.suppliers)PD.suppliers=d.suppliers;
+    const d=JSON.parse(f.content);if(d.years)Object.assign(PD.years,d.years);if(d.stages&&d.stages.length)PD.stages=d.stages;if(d.currentYear)PD.currentYear=d.currentYear;if(d.suppliers)PD.suppliers=d.suppliers;if(d.company)PD.company=d.company;
     saveAll();render();setSync('ok','Pulled '+new Date().toLocaleTimeString());toast('☁ Production data pulled');
   }catch(e){setSync('err','Pull error');toast('Pull error: '+e.message)}
 }
