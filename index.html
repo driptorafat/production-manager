@@ -474,7 +474,20 @@ const I18N={
   'this year':'এই বছর','supplier / make cost':'সাপ্লায়ার / তৈরির খরচ','after delivery':'ডেলিভারির পর','units (allocated)':'ইউনিট (বরাদ্দকৃত)',
   'No suppliers yet':'এখনো কোনো সাপ্লায়ার নেই','No orders match. ':'কোনো অর্ডার মেলেনি। ',
   // placeholders
-  'Search order #, buyer, product, destination…':'অর্ডার #, বায়ার, পণ্য, গন্তব্য খুঁজুন…','Task…':'কাজ…','Note (what was done)':'নোট (কী করা হয়েছে)','%':'%'
+  'Search order #, buyer, product, destination…':'অর্ডার #, বায়ার, পণ্য, গন্তব্য খুঁজুন…','Task…':'কাজ…','Note (what was done)':'নোট (কী করা হয়েছে)',
+  // Settings
+  'GitHub Personal Access Token (gist scope)':'GitHub পার্সোনাল অ্যাক্সেস টোকেন (gist scope)','Gist ID (same as Export Manager)':'Gist ID (এক্সপোর্ট ম্যানেজারের মতোই)',
+  'Auto-push production data on every change':'প্রতিবার পরিবর্তনে প্রোডাকশন ডেটা অটো-পুশ',
+  'USD → BDT rate (for margin)':'USD → BDT রেট (মার্জিনের জন্য)','Advance % (WO payment term)':'অগ্রিম % (WO পেমেন্ট শর্ত)','Next WO sequence #':'পরের WO ক্রমিক #',
+  'Company Name (as printed)':'কোম্পানির নাম (যেমন ছাপা হবে)','Company Address':'কোম্পানির ঠিকানা','Ref. Number prefix':'রেফ. নম্বর প্রিফিক্স',
+  'New Username':'নতুন ইউজারনেম','New Password':'নতুন পাসওয়ার্ড','Language / ভাষা':'ভাষা / Language','Theme / থিম':'থিম / Theme',
+  'Push Production Data':'প্রোডাকশন ডেটা পুশ','Pull Production Data':'প্রোডাকশন ডেটা পুল','Push Shipped Status → Export Manager':'শিপড স্ট্যাটাস পুশ → এক্সপোর্ট ম্যানেজার',
+  'Define your pipeline. The last stage is treated as "completed/shipped". These become the columns on the board.':'আপনার পাইপলাইন ঠিক করুন। শেষ স্টেজটিকে "সম্পন্ন/শিপড" ধরা হয়। এগুলো বোর্ডের কলাম হয়।',
+  // Suppliers
+  'Assign to supplier':'সাপ্লায়ারে বরাদ্দ','Enter each order’s % done for the selected week below':'নিচে নির্বাচিত সপ্তাহের জন্য প্রতিটি অর্ডারের % লিখুন',
+  'Week:':'সপ্তাহ:','Weekly progress trend — avg % (last 6 weeks)':'সাপ্তাহিক অগ্রগতি ট্রেন্ড — গড় % (শেষ ৬ সপ্তাহ)',
+  'Order timeline — start → finish (overlapping bars = concurrent load)':'অর্ডার টাইমলাইন — শুরু → শেষ (ওভারল্যাপ বার = একসাথে চাপ)',
+  'Avg progress this week —':'এই সপ্তাহের গড় অগ্রগতি —','active orders':'সক্রিয় অর্ডার','units (allocated)':'ইউনিট (বরাদ্দকৃত)','capacity used':'সক্ষমতা ব্যবহৃত'
 };
 // Regex rules for strings with dynamic parts (number, year, etc.)
 const I18N_RULES=[
@@ -490,8 +503,19 @@ const I18N_RULES=[
   [/^(\d[\d,]*) supplier POs? · .+$/,r=>r[1]+' সাপ্লায়ার PO · ইস্যু, প্রাপ্তি ও পেমেন্ট ট্র্যাক'],
   [/^(\d[\d,]*) orders?$/,r=>r[1]+' অর্ডার'],
   [/^unpaid (\d+)%$/,r=>'অপরিশোধিত '+r[1]+'%'],
+  [/^Supplier List \((\d+)\)$/,r=>'সাপ্লায়ার তালিকা ('+r[1]+')'],
+  [/^Unallocated Orders \((\d+)\)$/,r=>'অবরাদ্দ অর্ডার ('+r[1]+')'],
+  [/^Export CSV \((\d{4})\)$/,r=>'CSV এক্সপোর্ট ('+r[1]+')'],
+  [/^Clear (\d{4}) Orders$/,r=>r[1]+' অর্ডার মুছুন'],
+  [/^Terms & Conditions \(.+\) — one per line$/,()=>'শর্তাবলী — প্রতি লাইনে একটি'],
+  [/^Enter each order.s % done for the selected week below$/,()=>'নিচে নির্বাচিত সপ্তাহের জন্য প্রতিটি অর্ডারের % লিখুন'],
+  [/^Order share = .+$/,()=>'অর্ডার শেয়ার = বরাদ্দকৃত ইউনিট ÷ মোট বরাদ্দকৃত সক্রিয় ইউনিট। সাপ্লায়ারে যেতে সারিতে ক্লিক করুন।'],
+  [/^Signatory labels — one per line.*$/,()=>'স্বাক্ষরকারীর লেবেল — প্রতি লাইনে একটি'],
+  [/^(\d[\d,]*) in production$/,r=>r[1]+' টি উৎপাদনে'],
   [/^This Week's Progress — .+$/,()=>'এই সপ্তাহের অগ্রগতি (সাপ্লায়ার অনুযায়ী)']
 ];
+// For dynamic sentences built in JS (alerts etc.) — pick language at build time
+function L(en,bn){return LANG==='bn'?bn:en;}
 function translateText(raw){if(LANG!=='bn'||!raw)return raw;
   const m=raw.match(/^(\s*[^\p{L}\p{N}]+\s*)?([\s\S]*?)(\s*)$/u);
   const lead=(m&&m[1])||'',body=(m&&m[2])||raw,tail=(m&&m[3])||'';
@@ -560,14 +584,15 @@ const STAGE_COLORS=['#94a3b8','#f59e0b','#3b82f6','#a855f7','#06b6d4','#10b981',
 
 // Proactive alerts: overdue orders, TNA slippage, unpaid WO advance/balance, unallocated
 function dashAlerts(y){const items=[];const active=getProds(y).filter(p=>!p.cancelled&&!isClosed(p));
-  active.forEach(p=>{const d=daysUntil(p.exf);if(d!==null&&d<0)items.push({ic:'⏰',txt:(p.orderNo||'—')+' — ex-factory overdue by '+Math.abs(d)+'d',id:p.id,cls:'err'});});
+  const no=p=>(p.orderNo||'—');
+  active.forEach(p=>{const d=daysUntil(p.exf);if(d!==null&&d<0)items.push({ic:'⏰',txt:L(no(p)+' — ex-factory overdue by '+Math.abs(d)+'d',no(p)+' — এক্স-ফ্যাক্টরি '+Math.abs(d)+' দিন পার'),id:p.id,cls:'err'});});
   active.forEach(p=>{(p.tna||[]).forEach(m=>{const st=tnaState(m);
-    if(st==='overdue')items.push({ic:'⏱',txt:(p.orderNo||'—')+': “'+m.label+'” past planned '+fmtDate(m.planned),id:p.id,cls:'err'});
-    else if(st==='soon')items.push({ic:'⏱',txt:(p.orderNo||'—')+': “'+m.label+'” due '+fmtDate(m.planned),id:p.id,cls:'warn'});});});
+    if(st==='overdue')items.push({ic:'⏱',txt:L(no(p)+': “'+m.label+'” past planned '+fmtDate(m.planned),no(p)+': “'+m.label+'” পরিকল্পিত '+fmtDate(m.planned)+' পার'),id:p.id,cls:'err'});
+    else if(st==='soon')items.push({ic:'⏱',txt:L(no(p)+': “'+m.label+'” due '+fmtDate(m.planned),no(p)+': “'+m.label+'” '+fmtDate(m.planned)+' তারিখে দরকার'),id:p.id,cls:'warn'});});});
   getProds(y).filter(p=>!p.cancelled).forEach(p=>{const w=p.wo;if(w&&w.woNo&&woTotal(w)>0){
-    if(!w.advancePaid)items.push({ic:'💰',txt:(p.orderNo||'—')+' '+w.woNo+': advance ৳'+woAdvanceAmt(w).toLocaleString()+' unpaid',id:p.id,cls:'warn'});
-    if((+w.receivedQty||0)>0&&!w.balancePaid)items.push({ic:'💰',txt:(p.orderNo||'—')+' '+w.woNo+': balance ৳'+woBalanceAmt(w).toLocaleString()+' unpaid',id:p.id,cls:'warn'});}});
-  active.filter(p=>!(p.allocations||[]).length).forEach(p=>items.push({ic:'👷',txt:(p.orderNo||'—')+' — not allocated to a supplier',id:p.id,cls:'mut'}));
+    if(!w.advancePaid)items.push({ic:'💰',txt:L(no(p)+' '+w.woNo+': advance ৳'+woAdvanceAmt(w).toLocaleString()+' unpaid',no(p)+' '+w.woNo+': অগ্রিম ৳'+woAdvanceAmt(w).toLocaleString()+' বাকি'),id:p.id,cls:'warn'});
+    if((+w.receivedQty||0)>0&&!w.balancePaid)items.push({ic:'💰',txt:L(no(p)+' '+w.woNo+': balance ৳'+woBalanceAmt(w).toLocaleString()+' unpaid',no(p)+' '+w.woNo+': ব্যালেন্স ৳'+woBalanceAmt(w).toLocaleString()+' বাকি'),id:p.id,cls:'warn'});}});
+  active.filter(p=>!(p.allocations||[]).length).forEach(p=>items.push({ic:'👷',txt:L(no(p)+' — not allocated to a supplier',no(p)+' — কোনো সাপ্লায়ারে বরাদ্দ নেই'),id:p.id,cls:'mut'}));
   const pr={err:0,warn:1,mut:2};items.sort((a,b)=>pr[a.cls]-pr[b.cls]);return items;}
 function dashAlertsCard(y){const items=dashAlerts(y);if(!items.length)return '';const col={err:'var(--err)',warn:'var(--warn)',mut:'var(--muted)'};const show=items.slice(0,14);
   return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--warn)"><div class="card-title">⚠ Action Needed (${items.length})</div>
