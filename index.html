@@ -249,6 +249,7 @@ hr.div{border:none;border-top:1px solid var(--divider);margin:16px 0}
       <select class="yr-sel" id="yr-sel" onchange="changeYear(this.value)"></select>
       <span class="sync-pill" id="sync-status"><span class="sync-dot"></span>Not synced</span>
       <a class="btn btn-ghost btn-sm" href="https://driptorafat.github.io/export-manager/" title="Open Export Manager" style="text-decoration:none">📦 Export Manager</a>
+      <button class="btn btn-ghost btn-sm" id="lang-btn" onclick="toggleLang()" title="Switch language / ভাষা বদলান">🌐 বাংলা</button>
       <span class="topbar-user" id="topbar-user">👤 admin</span>
     </header>
     <main class="content" id="content"></main>
@@ -403,6 +404,118 @@ function confirm2(title,msg,onok,okLabel,okClass){$('cf-title').textContent=titl
 function setSync(type,msg){const el=$('sync-status');if(el)el.innerHTML='<span class="sync-dot sync-'+type+'"></span>'+esc(msg)}
 function setTheme(t){$('root-html').setAttribute('data-theme',t);localStorage.setItem('pm_theme',t)}
 
+// ── Language (English ↔ বাংলা) ────────────────────────────────────────────────
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+let LANG=lsGet('pm_lang')||'en';
+// Dictionary keyed by the exact English UI phrase (leading icons/+/emoji are stripped
+// before lookup and re-added after, so "🖨 Preview / Print" → key "Preview / Print").
+const I18N={
+  // nav + chrome
+  'Dashboard':'ড্যাশবোর্ড','Production Board':'প্রোডাকশন বোর্ড','Orders':'অর্ডার','Production Orders':'প্রোডাকশন অর্ডার',
+  'Work Orders':'ওয়ার্ক অর্ডার','Suppliers':'সাপ্লায়ার','Schedule':'শিডিউল','Deadlines':'ডেডলাইন','Reports':'রিপোর্ট','Settings':'সেটিংস',
+  'Export Manager':'এক্সপোর্ট ম্যানেজার','Not synced':'সিঙ্ক হয়নি','Not linked':'লিঙ্ক করা নেই',
+  'English':'English','বাংলা':'বাংলা',
+  // subtitles
+  'Live production overview':'লাইভ প্রোডাকশন ওভারভিউ',
+  'Drag cards between stages to update progress':'অগ্রগতি আপডেট করতে কার্ড টেনে স্টেজ বদলান',
+  'Active orders by ex-factory date':'এক্স-ফ্যাক্টরি তারিখ অনুযায়ী সক্রিয় অর্ডার',
+  'Printable production reports (save as PDF via print dialog)':'প্রিন্টযোগ্য রিপোর্ট (প্রিন্ট ডায়ালগ থেকে PDF সেভ করুন)',
+  // KPI + card titles
+  'Active Orders':'সক্রিয় অর্ডার','Due ≤ 7 days':'৭ দিনের মধ্যে','Overdue':'মেয়াদোত্তীর্ণ','Completed':'সম্পন্ন',
+  'On-time Rate':'সময়মতো হার','Active Units':'সক্রিয় ইউনিট','Est. Margin':'আনুমানিক মার্জিন',
+  'Total WO Value':'মোট WO মূল্য','Advance Due':'অগ্রিম বাকি','Balance Due':'ব্যালেন্স বাকি',
+  'Orders by Stage':'স্টেজ অনুযায়ী অর্ডার','Upcoming Deadlines':'আসন্ন ডেডলাইন','Orders by Ex-Factory Month':'এক্স-ফ্যাক্টরি মাস অনুযায়ী অর্ডার',
+  'Production by Supplier':'সাপ্লায়ার অনুযায়ী প্রোডাকশন',
+  'Cloud Sync & Export Manager Link':'ক্লাউড সিঙ্ক ও এক্সপোর্ট ম্যানেজার লিঙ্ক','Appearance':'থিম','Production Stages':'প্রোডাকশন স্টেজ',
+  'Company Profile — Work Order (PO) header':'কোম্পানি প্রোফাইল — ওয়ার্ক অর্ডার হেডার',
+  'Planning & Costing':'পরিকল্পনা ও খরচ','TNA Milestone Template':'TNA মাইলস্টোন টেমপ্লেট',
+  'Data Management':'ডেটা ব্যবস্থাপনা','Login Credentials':'লগইন তথ্য','Supplier List':'সাপ্লায়ার তালিকা',
+  // buttons
+  'New Order':'নতুন অর্ডার','Import Orders':'অর্ডার ইম্পোর্ট','Export CSV':'CSV এক্সপোর্ট','Cancel':'বাতিল',
+  'Save Order':'অর্ডার সেভ','Save Supplier':'সাপ্লায়ার সেভ','Add Supplier':'সাপ্লায়ার যোগ','Add item':'আইটেম যোগ',
+  'Add task':'কাজ যোগ','Add material':'ম্যাটেরিয়াল যোগ','Add supplier':'সাপ্লায়ার যোগ','Add step':'ধাপ যোগ','Add milestone':'মাইলস্টোন যোগ','Add stage':'স্টেজ যোগ',
+  'Preview / Print':'প্রিভিউ / প্রিন্ট','Preview / Print Work Order':'ওয়ার্ক অর্ডার প্রিভিউ / প্রিন্ট','WhatsApp text':'WhatsApp টেক্সট',
+  'Issue WO (assign number)':'WO ইস্যু (নম্বর দিন)','Copy Update':'আপডেট কপি','Weekly Report':'সাপ্তাহিক রিপোর্ট','Edit':'এডিট',
+  'Delete this order':'এই অর্ডার মুছুন','Delete supplier':'সাপ্লায়ার মুছুন','This week':'এই সপ্তাহ','Show completed (recent)':'সম্পন্ন দেখান (সাম্প্রতিক)',
+  'Recompute from ex-factory':'এক্স-ফ্যাক্টরি থেকে পুনঃগণনা','Reset default':'ডিফল্টে ফিরুন','Reset to Hand Touch defaults':'Hand Touch ডিফল্টে ফিরুন',
+  'Save Cloud Config':'ক্লাউড কনফিগ সেভ','Save Company Profile':'কোম্পানি প্রোফাইল সেভ','Save':'সেভ','Update Credentials':'তথ্য আপডেট','Sign Out':'সাইন আউট',
+  'Backup JSON':'JSON ব্যাকআপ','Restore JSON':'JSON রিস্টোর','Import Orders from Export Manager':'এক্সপোর্ট ম্যানেজার থেকে অর্ডার ইম্পোর্ট',
+  'Push Production Data':'প্রোডাকশন ডেটা পুশ','Pull Production Data':'প্রোডাকশন ডেটা পুল','Done':'সম্পন্ন','Confirm':'নিশ্চিত','Delete':'মুছুন',
+  // table headers
+  'Order #':'অর্ডার #','Buyer':'বায়ার','Supplier':'সাপ্লায়ার','Product':'পণ্য','Dest':'গন্তব্য','Qty':'পরিমাণ','Stage':'স্টেজ',
+  'Progress':'অগ্রগতি','Ex-Factory':'এক্স-ফ্যাক্টরি','Priority':'প্রায়োরিটি','WO No':'WO নম্বর','Order / Buyer':'অর্ডার / বায়ার',
+  'Items':'আইটেম','Total ৳':'মোট ৳','Recv/Rej':'প্রাপ্ত/বাতিল','Advance':'অগ্রিম','Balance':'ব্যালেন্স','Status':'স্ট্যাটাস','Delivery':'ডেলিভারি',
+  'Company':'কোম্পানি','Contact':'যোগাযোগ','Address':'ঠিকানা','Capacity /mo':'সক্ষমতা /মাস','Rating':'রেটিং','Order Share':'অর্ডার শেয়ার',
+  'Buyer / Party':'বায়ার / পার্টি','Alloc Qty':'বরাদ্দ পরিমাণ','Overall':'সামগ্রিক','This week %':'এই সপ্তাহ %','Deadline':'ডেডলাইন',
+  // form labels
+  'Order No':'অর্ডার নং','Product / Item':'পণ্য / আইটেম','Destination':'গন্তব্য','Quantity (pcs)':'পরিমাণ (পিস)',
+  'Volume (CBM)':'ভলিউম (CBM)','Order Value (USD)':'অর্ডার মূল্য (USD)','Month':'মাস','Start Date':'শুরুর তারিখ',
+  'Ex-Factory / Deadline':'এক্স-ফ্যাক্টরি / ডেডলাইন','Quality Check':'কোয়ালিটি চেক','Notes':'নোট','Photos':'ছবি',
+  'Work Order for supplier':'সাপ্লায়ারের জন্য ওয়ার্ক অর্ডার','WO Status':'WO স্ট্যাটাস','WO Number':'WO নম্বর','Received (pcs)':'প্রাপ্ত (পিস)',
+  'Penalty / deduction ৳':'জরিমানা / কর্তন ৳','Ordered → Accepted':'অর্ডারকৃত → গৃহীত','Issue Date':'ইস্যু তারিখ','Delivery Date':'ডেলিভারি তারিখ','Ref. Number':'রেফ. নম্বর',
+  'Production Checklist':'প্রোডাকশন চেকলিস্ট','Raw Materials / BOM':'কাঁচামাল / BOM',
+  'Supplier / Factory Name *':'সাপ্লায়ার / ফ্যাক্টরির নাম *','Contact Person':'যোগাযোগকারী ব্যক্তি','Phone':'ফোন','Email':'ইমেইল',
+  'Specialty / Products':'বিশেষত্ব / পণ্য','Monthly Capacity (units)':'মাসিক সক্ষমতা (ইউনিট)','Supplier Rating':'সাপ্লায়ার রেটিং',
+  'Supplier Allocation — split this order across one or more factories':'সাপ্লায়ার বরাদ্দ — এক বা একাধিক ফ্যাক্টরিতে ভাগ করুন',
+  '📄 Supplier Work Order (PO) — printable in your Bengali format':'📄 সাপ্লায়ার ওয়ার্ক অর্ডার (PO) — বাংলা ফরম্যাটে প্রিন্টযোগ্য',
+  '⏱ Time & Action (TNA) — milestones back-scheduled from the ex-factory date':'⏱ টাইম অ্যান্ড অ্যাকশন (TNA) — এক্স-ফ্যাক্টরি থেকে পিছিয়ে হিসাব করা মাইলস্টোন',
+  // stages / priorities / statuses
+  'Pending':'অপেক্ষমাণ','Material Sourcing':'কাঁচামাল সংগ্রহ','In Production':'উৎপাদনে','Quality Check':'কোয়ালিটি চেক',
+  'Packing':'প্যাকিং','Ready to Ship':'শিপের জন্য প্রস্তুত','Shipped':'শিপড',
+  'Low':'নিম্ন','Normal':'স্বাভাবিক','High':'উচ্চ','Urgent':'জরুরি',
+  'Draft':'খসড়া','Issued':'ইস্যুকৃত','Partial':'আংশিক','Received':'প্রাপ্ত','Closed':'সম্পন্ন',
+  'Active':'সক্রিয়','Inactive':'নিষ্ক্রিয','Pass':'পাস','Fail':'ফেল','Rework':'রিওয়ার্ক',
+  // misc
+  'All stages':'সব স্টেজ','All priorities':'সব প্রায়োরিটি','All suppliers':'সব সাপ্লায়ার','— Unallocated —':'— অবরাদ্দ —',
+  'on-time':'সময়মতো','reject':'বাতিল','capacity used':'সক্ষমতা ব্যবহৃত','active orders':'সক্রিয় অর্ডার','units (allocated)':'ইউনিট (বরাদ্দকৃত)','overdue':'মেয়াদোত্তীর্ণ',
+  // dashboard / KPI sub-labels
+  'approaching ex-factory':'এক্স-ফ্যাক্টরি এগিয়ে আসছে','needs attention':'মনোযোগ দরকার','all on track':'সব ঠিক আছে',
+  'this year':'এই বছর','supplier / make cost':'সাপ্লায়ার / তৈরির খরচ','after delivery':'ডেলিভারির পর','units (allocated)':'ইউনিট (বরাদ্দকৃত)',
+  'No suppliers yet':'এখনো কোনো সাপ্লায়ার নেই','No orders match. ':'কোনো অর্ডার মেলেনি। ',
+  // placeholders
+  'Search order #, buyer, product, destination…':'অর্ডার #, বায়ার, পণ্য, গন্তব্য খুঁজুন…','Task…':'কাজ…','Note (what was done)':'নোট (কী করা হয়েছে)','%':'%'
+};
+// Regex rules for strings with dynamic parts (number, year, etc.)
+const I18N_RULES=[
+  [/^(.+?) — (\d{4})$/,r=>(I18N[r[1]]||r[1])+' — '+r[2]],
+  [/^Action Needed \((\d+)\)$/,r=>'করণীয় ('+r[1]+')'],
+  [/^Production Stage — (\d+)% complete$/,r=>'প্রোডাকশন স্টেজ — '+r[1]+'% সম্পন্ন'],
+  [/^(\d+) in production$/,r=>r[1]+' টি উৎপাদনে'],
+  [/^shipped or paid in (\d{4})$/,r=>'শিপড বা পরিশোধিত '+r[1]],
+  [/^(\d[\d,]*) shipped w\/ dates$/,r=>r[1]+' টি তারিখসহ শিপড'],
+  [/^\$([\d,]+) order value$/,r=>'$'+r[1]+' অর্ডার মূল্য'],
+  [/^৳([\d,]+) over WO cost$/,r=>'৳'+r[1]+' WO খরচের উপর'],
+  [/^(\d[\d,]*) suppliers? · .+$/,r=>r[1]+' সাপ্লায়ার · বরাদ্দ ও সাপ্তাহিক অগ্রগতি'],
+  [/^(\d[\d,]*) supplier POs? · .+$/,r=>r[1]+' সাপ্লায়ার PO · ইস্যু, প্রাপ্তি ও পেমেন্ট ট্র্যাক'],
+  [/^(\d[\d,]*) orders?$/,r=>r[1]+' অর্ডার'],
+  [/^unpaid (\d+)%$/,r=>'অপরিশোধিত '+r[1]+'%'],
+  [/^This Week's Progress — .+$/,()=>'এই সপ্তাহের অগ্রগতি (সাপ্লায়ার অনুযায়ী)']
+];
+function translateText(raw){if(LANG!=='bn'||!raw)return raw;
+  const m=raw.match(/^(\s*[^\p{L}\p{N}]+\s*)?([\s\S]*?)(\s*)$/u);
+  const lead=(m&&m[1])||'',body=(m&&m[2])||raw,tail=(m&&m[3])||'';
+  if(I18N[body]!=null)return lead+I18N[body]+tail;
+  for(const[re,fn]of I18N_RULES){const r=body.match(re);if(r)return lead+fn(r)+tail;}
+  return raw;}
+let _langObs=null,_applying=false;
+function applyLang(){if(LANG!=='bn')return;if(_applying)return;_applying=true;
+  try{const root=document.body;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){
+      if(!n.nodeValue||!n.nodeValue.trim())return NodeFilter.FILTER_REJECT;
+      const pt=n.parentNode&&n.parentNode.nodeName;if(pt==='SCRIPT'||pt==='STYLE'||pt==='TEXTAREA')return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;}});
+    const nodes=[];let nd;while(nd=w.nextNode())nodes.push(nd);
+    nodes.forEach(n=>{const t=translateText(n.nodeValue);if(t!==n.nodeValue)n.nodeValue=t;});
+    document.querySelectorAll('[placeholder]').forEach(el=>{const p=el.getAttribute('placeholder');const t=translateText(p);if(t!==p)el.setAttribute('placeholder',t);});
+  }catch(e){}_applying=false;}
+function setupLangObserver(){if(_langObs)return;try{_langObs=new MutationObserver(()=>{if(_applying||LANG!=='bn')return;
+    requestAnimationFrame(()=>{applyLang();});});
+  _langObs.observe(document.body,{childList:true,subtree:true,characterData:true});}catch(e){}}
+function updateLangBtn(){const b=$('lang-btn');if(b)b.textContent='🌐 '+(LANG==='bn'?'English':'বাংলা');}
+function toggleLang(){LANG=LANG==='bn'?'en':'bn';lsSet('pm_lang',LANG);updateLangBtn();
+  if(typeof render==='function')render();applyLang();updateLangBtn();
+  toast(LANG==='bn'?'ভাষা: বাংলা':'Language: English');}
+
 // ── Routing ──────────────────────────────────────────────────────────────────
 const ROUTES=[['dashboard','📊','Dashboard'],['board','🗂️','Production Board'],['orders','📋','Orders'],
   ['workorders','📄','Work Orders'],['suppliers','👷','Suppliers'],['schedule','📆','Schedule'],['calendar','📅','Deadlines'],['reports','🖨️','Reports'],['settings','⚙️','Settings']];
@@ -430,6 +543,7 @@ function render(){
   else if(route==='calendar')c.innerHTML=renderCalendar();
   else if(route==='reports')c.innerHTML=renderReports();
   else if(route==='settings')c.innerHTML=renderSettings();
+  applyLang();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1140,6 +1254,12 @@ function renderSettings(){
   </div>
 
   <div class="card"><div class="card-title">🎨 Appearance</div>
+    <label>Language / ভাষা</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button onclick="if(LANG!=='en')toggleLang()" class="btn btn-sm ${LANG==='en'?'btn-pri':'btn-ghost'}">🌐 English</button>
+      <button onclick="if(LANG!=='bn')toggleLang()" class="btn btn-sm ${LANG==='bn'?'btn-pri':'btn-ghost'}">🌐 বাংলা</button>
+    </div>
+    <label>Theme / থিম</label>
     <div style="display:flex;gap:10px;flex-wrap:wrap">${[['light','☀️ Light','#F0F4F8'],['dark','🌙 Dark','#0d1117'],['midnight','🌌 Midnight','#06070f'],['forest','🌿 Forest','#0a1410'],['ocean','🌊 Ocean','#03080f'],['sepia','📜 Sepia','#f4ede0']].map(([id,l,bg])=>`<button onclick="setTheme('${id}')" style="display:flex;align-items:center;gap:7px;padding:7px 12px;border:1.5px solid var(--bdr);border-radius:9px;background:var(--card);color:var(--txt);cursor:pointer;font-size:12.5px"><span style="width:14px;height:14px;border-radius:50%;background:${bg};border:1px solid var(--bdr)"></span>${l}</button>`).join('')}</div>
     <hr class="div">
     <div class="card-title">🛠 Production Stages</div>
@@ -1583,7 +1703,7 @@ function setupPWA(){try{
   let a=document.querySelector('link[rel="apple-touch-icon"]');if(!a){a=document.createElement('link');a.rel='apple-touch-icon';document.head.appendChild(a);}a.href=pwaIcon(180);
 }catch(e){}}
 (function init(){const t=localStorage.getItem('pm_theme')||'light';$('root-html').setAttribute('data-theme',t);
-  setupPWA();
+  setupPWA();setupLangObserver();updateLangBtn();applyLang();
   if(sessionStorage.getItem('pm_session')==='ok'){$('login-screen').classList.add('hidden');$('topbar-user').textContent='👤 '+(sessionStorage.getItem('pm_user')||'admin');bootApp();}
   else{$('login-screen').classList.remove('hidden');setTimeout(()=>$('l-user').focus(),100)}
 })();
